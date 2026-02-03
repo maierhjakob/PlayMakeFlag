@@ -12,13 +12,15 @@ interface PlaybookSidebarProps {
     onNewPlay: () => void;
     onSavePlay: () => void;
     onDeletePlay: (id: string) => void;
-    onStartDrawing: (type: 'primary' | 'option' | 'check') => void;
+    onStartDrawing: (type: 'primary' | 'option' | 'check' | 'endzone') => void;
     onClearRoutes: () => void;
     onAddPlayer: () => void;
     onUpdatePlayer: (id: string, updates: Partial<Player>) => void;
     onSetFormation: (type: 'strong-left' | 'strong-right') => void;
     onSetPosition: (role: string) => void;
     onApplyRoute: (preset: any) => void;
+    activeRouteType: 'primary' | 'option' | 'check' | 'endzone';
+    onSetActiveRouteType: (type: 'primary' | 'option' | 'check' | 'endzone') => void;
     isDrawing: boolean;
     onFinishDrawing: () => void;
     className?: string;
@@ -39,6 +41,8 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     onSetFormation,
     onSetPosition,
     onApplyRoute,
+    activeRouteType,
+    onSetActiveRouteType,
     isDrawing,
     onFinishDrawing,
     className
@@ -174,9 +178,52 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/50">
-                        {/* Route Presets */}
+                        {/* Route Type Toggle */}
                         <div className="col-span-2">
-                            <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2">Routes</div>
+                            <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2 text-center">Active Route Layer</div>
+                            <div className="flex bg-slate-900 rounded p-1 border border-slate-700">
+                                <button
+                                    onClick={() => onSetActiveRouteType('primary')}
+                                    className={cn(
+                                        "flex-1 py-1 rounded text-[10px] font-medium transition-all",
+                                        activeRouteType === 'primary' ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"
+                                    )}
+                                >
+                                    Primary (Solid)
+                                </button>
+                                <button
+                                    onClick={() => onSetActiveRouteType('option')}
+                                    className={cn(
+                                        "flex-1 py-1 rounded text-[10px] font-medium transition-all",
+                                        activeRouteType === 'option' ? "bg-amber-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"
+                                    )}
+                                >
+                                    Option
+                                </button>
+                                <button
+                                    onClick={() => onSetActiveRouteType('check')}
+                                    className={cn(
+                                        "flex-1 py-1 rounded text-[10px] font-medium transition-all",
+                                        activeRouteType === 'check' ? "bg-slate-700 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"
+                                    )}
+                                >
+                                    Check
+                                </button>
+                                <button
+                                    onClick={() => onSetActiveRouteType('endzone')}
+                                    className={cn(
+                                        "flex-1 py-1 rounded text-[10px] font-medium transition-all",
+                                        activeRouteType === 'endzone' ? "bg-pink-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"
+                                    )}
+                                >
+                                    Endzone
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Route Presets */}
+                        <div className="col-span-2 mt-1">
+                            <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2">Preset Routes</div>
                             <div className="grid grid-cols-3 gap-1.5">
                                 {ROUTE_PRESETS.map(preset => (
                                     <button

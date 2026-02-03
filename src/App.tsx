@@ -17,6 +17,7 @@ function App() {
 
   // Drawing state
   const [isDrawing, setIsDrawing] = useState(false);
+  const [activeRouteType, setActiveRouteType] = useState<RouteType>('primary');
   const [drawingType, setDrawingType] = useState<RouteType>('primary');
   const [activeRoutePoints, setActiveRoutePoints] = useState<Point[]>([]);
 
@@ -195,20 +196,22 @@ function App() {
     // Create new route segment
     const newRoute: RouteSegment = {
       id: crypto.randomUUID(),
-      type: 'primary',
+      type: activeRouteType,
       points: points
     };
 
-    // Replace routes for now
+    // Replace only the route of the current type (or add if doesn't exist)
     const updatedPlayers = currentPlay.players.map(p =>
-      p.id === selectedPlayer.id ? { ...p, routes: [newRoute] } : p
+      p.id === selectedPlayer.id
+        ? { ...p, routes: [...p.routes.filter(r => r.type !== activeRouteType), newRoute] }
+        : p
     );
     updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
   };
 
-  const startDrawing = (type: RouteType) => {
+  const startDrawing = () => {
     if (!selectedPlayer) return;
-    setDrawingType(type);
+    setDrawingType(activeRouteType);
     setIsDrawing(true);
     // Center start point (Now handled naturally)
     const startPos = selectedPlayer.position;
@@ -233,7 +236,9 @@ function App() {
       points: activeRoutePoints
     };
     const updatedPlayers = currentPlay.players.map(p =>
-      p.id === selectedPlayer.id ? { ...p, routes: [...p.routes, newRoute] } : p
+      p.id === selectedPlayer.id
+        ? { ...p, routes: [...p.routes.filter(r => r.type !== drawingType), newRoute] }
+        : p
     );
     updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
     setIsDrawing(false);
@@ -300,6 +305,8 @@ function App() {
         onSetFormation={handleFormation}
         onApplyRoute={handleApplyRoute}
         onSetPosition={handleSetPosition}
+        activeRouteType={activeRouteType}
+        onSetActiveRouteType={setActiveRouteType}
         isDrawing={isDrawing}
         onFinishDrawing={finishDrawing}
       />
@@ -324,8 +331,9 @@ function App() {
             <Field onClick={handleFieldClick} className={isDrawing ? 'cursor-crosshair' : 'cursor-default'}>
               {/* Render Routes */}
               <svg className="absolute inset-0 pointer-events-none z-0" width="100%" height="100%">
+                {/* 1. Render Background Routes (Option, Check) */}
                 {currentPlay?.players.map(player => (
-                  player.routes.map(route => (
+                  player.routes.filter(r => r.type !== 'primary').map(route => (
                     <RoutePath
                       key={route.id}
                       segment={route}
@@ -334,7 +342,18 @@ function App() {
                     />
                   ))
                 ))}
-                {/* Active Drawing Route */}
+                {/* 2. Render Foreground Routes (Primary) */}
+                {currentPlay?.players.map(player => (
+                  player.routes.filter(r => r.type === 'primary').map(route => (
+                    <RoutePath
+                      key={route.id}
+                      segment={route}
+                      color={player.color}
+                      isSelected={selectedPlayerId === player.id}
+                    />
+                  ))
+                ))}
+                {/* Active Drawing Route (Always top) */}$SAME$
                 {isDrawing && activeRoutePoints.length > 0 && (
                   <RoutePath
                     segment={{ id: 'drawing', type: drawingType, points: activeRoutePoints }}

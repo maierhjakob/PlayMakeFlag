@@ -3,7 +3,7 @@ export type Point = {
     y: number;
 };
 
-export type RouteType = 'primary' | 'option' | 'check';
+export type RouteType = 'primary' | 'option' | 'check' | 'endzone';
 
 export type RouteSegment = {
     id: string;

@@ -10,6 +10,19 @@ interface RoutePathProps {
 export const RoutePath: React.FC<RoutePathProps> = ({ segment, color, isSelected }) => {
     if (segment.points.length < 2) return null;
 
+    // Styles based on route type
+    const strokeDasharray =
+        segment.type === 'primary' ? 'none' :
+            segment.type === 'option' ? '8,12' :
+                segment.type === 'endzone' ? '12,8' : 'none';
+    const baseWidth = segment.type === 'primary' ? 4.5 : 3;
+    const strokeWidth = isSelected ? baseWidth + 1.5 : baseWidth;
+    const strokeOpacity = (segment.type === 'check' || segment.type === 'endzone') ? 0.8 : 1;
+    const strokeColor =
+        segment.type === 'check' ? '#000000' :
+            segment.type === 'endzone' ? '#f472b6' : color;
+    const arrowSize = (segment.type === 'check' || segment.type === 'endzone') ? 12 : 20;
+
     // Arrowhead calculations helpers
     const lastPoint = segment.points[segment.points.length - 1];
     const secondLast = segment.points[segment.points.length - 2];
@@ -21,8 +34,8 @@ export const RoutePath: React.FC<RoutePathProps> = ({ segment, color, isSelected
     const length = Math.sqrt(dx * dx + dy * dy);
 
     // Trim the line path so it doesn't poke through the arrow tip
-    // Retract 5px from the end
-    const trim = 5;
+    // Retract based on stroke width and arrow size
+    const trim = arrowSize / 4;
     let visualPoints = [...segment.points];
 
     if (length > trim) {
@@ -40,18 +53,12 @@ export const RoutePath: React.FC<RoutePathProps> = ({ segment, color, isSelected
         i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`
     ).join(' ');
 
-    // Styles based on route type
-    const strokeDasharray = segment.type === 'primary' ? 'none' : segment.type === 'option' ? '10,5' : '2,2'; // Check is dot
-    const strokeWidth = isSelected ? 4 : 3;
-    const strokeOpacity = segment.type === 'check' ? 0.7 : 1;
-
-
 
     return (
         <g className="pointer-events-none">
             <path
                 d={pathData}
-                stroke={color}
+                stroke={strokeColor}
                 strokeWidth={strokeWidth}
                 fill="none"
                 strokeLinecap="round"
@@ -61,8 +68,8 @@ export const RoutePath: React.FC<RoutePathProps> = ({ segment, color, isSelected
             />
             {/* Arrowhead */}
             <path
-                d="M -20 -10 L 0 0 L -20 10"
-                fill={color}
+                d={`M -${arrowSize} -${arrowSize / 2} L 0 0 L -${arrowSize} ${arrowSize / 2}`}
+                fill={strokeColor}
                 transform={`translate(${lastPoint.x}, ${lastPoint.y}) rotate(${angle})`}
             />
         </g>
