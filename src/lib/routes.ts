@@ -5,23 +5,31 @@ export type RoutePreset =
     | 'hitch'
     | 'out-5'
     | 'in-5'
+    | 'out-10'
+    | 'in-10'
+    | 'ir-in-5'
     | 'slant'
     | 'post'
     | 'corner'
     | 'go'
     | 'comeback'
+    | 'post-in'
     | 'cross';
 
 export const ROUTE_PRESETS: { label: string; value: RoutePreset }[] = [
     { label: 'Stop', value: 'hitch' },
-    { label: 'Out (5)', value: 'out-5' },
-    { label: 'In (5)', value: 'in-5' },
+    { label: '5-Out', value: 'out-5' },
+    { label: '5-In', value: 'in-5' },
+    { label: 'IR-5-In', value: 'ir-in-5' },
+    { label: '10-Out', value: 'out-10' },
+    { label: '10-In', value: 'in-10' },
     { label: 'Slant', value: 'slant' },
     { label: 'Post', value: 'post' },
     { label: 'Go', value: 'go' },
     { label: 'Comeback', value: 'comeback' },
     { label: 'Corner', value: 'corner' },
     { label: 'Cross', value: 'cross' },
+    { label: 'PostIn', value: 'post-in' },
 ];
 
 export const generateRoutePoints = (start: Point, preset: RoutePreset): Point[] => {
@@ -79,8 +87,20 @@ export const generateRoutePoints = (start: Point, preset: RoutePreset): Point[] 
             addAbsDepth(0, 5); // To 5y line
             addRel(5 * dirOut, 0); // Cut out
             break;
+        case 'out-10':
+            addAbsDepth(0, 10); // To 10y line
+            addRel(5 * dirOut, 0); // Cut out
+            break;
         case 'in-5':
             addAbsDepth(0, 5); // To 5y line
+            addRel(5 * dirIn, 0); // Cut in
+            break;
+        case 'ir-in-5':
+            addAbsDepth(2 * dirIn, 5); // To 5y line
+            addRel(15 * dirIn, 0); // Cut in
+            break;
+        case 'in-10':
+            addAbsDepth(0, 10); // To 10y line
             addRel(5 * dirIn, 0); // Cut in
             break;
         case 'slant':
@@ -91,24 +111,23 @@ export const generateRoutePoints = (start: Point, preset: RoutePreset): Point[] 
             addAbsDepth(0, 7); // Break at 7y (standard deep post break?)
             addRel(5 * dirIn, 7); // Deep middle
             break;
+        case 'post-in':
+            addAbsDepth(0, 7);
+            addRel(2 * dirIn, 3.2);
+            addRel(10 * dirIn, 0);
+            break;
         case 'corner':
             addAbsDepth(0, 7);
             addRel(5 * dirOut, 5); // Deep corner
             break;
         case 'go':
             addAbsDepth(0, 7); // Just go deep
-            addRel(1 * dirOut, 7); // Deep corner
+            addRel(1 * dirOut, 8); // Deep corner
             break;
         case 'comeback':
-            addAbsDepth(0, 12); // Drive deep to 12
-            addRel(2 * dirOut, 2); // 45 deg back to sideline? 
-            // actually comeback is usually back towards LOS (+Y in svg).
-            // addRel dy is "yards UP field". So -2 is back.
-            const last = points[points.length - 1];
-            points.push(clampPoint({
-                x: last.x + (2 * dirOut * S),
-                y: last.y + (2 * S) // +Y is down (back towards LOS)
-            }));
+            addAbsDepth(0, 7);
+            addRel(1 * dirOut, 7);
+            addRel(1 * dirOut, -2);
             break;
     }
 

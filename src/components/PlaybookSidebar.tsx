@@ -333,16 +333,24 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                             <div className="col-span-2 mt-1">
                                 <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2">Preset Routes</div>
                                 <div className="grid grid-cols-3 gap-1.5">
-                                    {ROUTE_PRESETS.map(preset => (
-                                        <button
-                                            key={preset.value}
-                                            onClick={() => onApplyRoute(preset.value)}
-                                            className="bg-slate-700 hover:bg-slate-600 px-1 py-1.5 rounded text-[10px] text-slate-200 border border-slate-600 transition-colors truncate"
-                                            title={preset.label}
-                                        >
-                                            {preset.label.replace(' (5)', '')}
-                                        </button>
-                                    ))}
+                                    {ROUTE_PRESETS.map(preset => {
+                                        const isActive = selectedPlayer.routes.find(r => r.type === activeRouteType)?.preset === preset.value;
+                                        return (
+                                            <button
+                                                key={preset.value}
+                                                onClick={() => onApplyRoute(preset.value)}
+                                                className={cn(
+                                                    "px-1 py-1.5 rounded text-[10px] border transition-all truncate",
+                                                    isActive
+                                                        ? "bg-blue-600 border-blue-400 text-white shadow-sm"
+                                                        : "bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600"
+                                                )}
+                                                title={preset.label}
+                                            >
+                                                {preset.label.replace(' (5)', '')}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
 

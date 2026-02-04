@@ -9,6 +9,7 @@ export type RouteSegment = {
     id: string;
     type: RouteType;
     points: Point[];
+    preset?: string;
 };
 
 export type PlayerRole = 'QB' | 'C' | 'WR-L' | 'WR-R' | 'RB' | 'R' | 'BR'; // Example roles

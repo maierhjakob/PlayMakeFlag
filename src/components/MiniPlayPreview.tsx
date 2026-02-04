@@ -139,10 +139,10 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
                     const arrowSize = 3;
                     arrowhead = (
                         <path
-                            d={`M -${arrowSize} -${arrowSize / 2} L 0 0 L -${arrowSize} ${arrowSize / 2}`}
-                            fill="none"
+                            d={`M -${arrowSize} -${arrowSize / 2} L 0 0 L -${arrowSize} ${arrowSize / 2} Z`}
+                            fill={route.type === 'option' ? 'white' : routeColor}
                             stroke={routeColor}
-                            strokeWidth="1.2"
+                            strokeWidth="0.8"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             transform={`translate(${tipX}, ${tipY}) rotate(${angle})`}

@@ -313,13 +313,28 @@ export function usePlaybook() {
     const handleApplyRoute = (preset: RoutePreset, routeType: RouteType) => {
         if (!selectedPlayer || !currentPlay) return;
 
+        // Toggle: If this preset is already applied to this specific route type, remove it
+        const existingRoute = selectedPlayer.routes.find(r => r.type === routeType);
+        if (existingRoute?.preset === preset) {
+            updateCurrentPlay({
+                ...currentPlay,
+                players: currentPlay.players.map(p =>
+                    p.id === selectedPlayer.id
+                        ? { ...p, routes: p.routes.filter(r => r.type !== routeType) }
+                        : p
+                )
+            });
+            return;
+        }
+
         const startPos = calculateRouteStart(selectedPlayer);
         const points = generateRoutePoints(startPos, preset);
 
         const newRoute: RouteSegment = {
             id: crypto.randomUUID(),
             type: routeType,
-            points
+            points,
+            preset // Store the preset ID for highlighting/toggling
         };
 
         const updatedPlayer = {
