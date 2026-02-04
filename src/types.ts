@@ -23,10 +23,29 @@ export type Player = {
     motion?: Point | null;
 };
 
-export type Play = {
+export interface Play {
     id: string;
     name: string;
     description?: string;
     players: Player[];
+    gridPosition?: {
+        row: number;    // 0-3 (for rows 1-4)
+        column: number; // 0-4 (for columns A-E)
+    };
     ballPosition?: Point;
-};
+}
+
+export interface PlaybookGrid {
+    columnNames: string[]; // Default: ['A', 'B', 'C', 'D', 'E']
+}
+
+export interface Playbook {
+    id: string;
+    name: string;
+    plays: Play[];
+    gridConfig: {
+        columnNames: string[];
+    };
+    createdAt: number;
+    updatedAt: number;
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Field } from '@/components/Field'
 import { PlaybookSidebar } from '@/components/PlaybookSidebar'
+import { PlaybookGrid } from '@/components/PlaybookGrid'
 import { PlayerToken } from '@/components/PlayerToken'
 import { RoutePath } from '@/components/RoutePath'
 import type { Point, RouteType, RouteSegment } from '@/types'
@@ -9,6 +10,14 @@ import { S, clampPoint } from '@/lib/constants'
 
 function App() {
   const {
+    // Playbooks
+    playbooks,
+    currentPlaybookId,
+    setCurrentPlaybookId,
+    handleNewPlaybook,
+    handleDeletePlaybook,
+    handleRenamePlaybook,
+    // Plays
     plays,
     currentPlay,
     currentPlayId,
@@ -22,7 +31,6 @@ function App() {
     handleDeletePlay,
     handleCopyPlay,
     handleUpdatePlayName,
-    handleAddPlayer,
     handleUpdatePlayer,
     handleSetPosition,
     handleFormation,
@@ -32,7 +40,12 @@ function App() {
     handleClearMotion,
     handleImportPlaybook,
     updateCurrentPlay,
-    calculateRouteStart
+    calculateRouteStart,
+    // Grid
+    columnNames,
+    handleUpdateColumnName,
+    handleAssignPlayToCell,
+    handleRemovePlayFromCell,
   } = usePlaybook();
 
   // Drawing state
@@ -115,63 +128,48 @@ function App() {
   }, [isDrawing, activeRoutePoints, setSelectedPlayerId]);
 
   return (
-    <div className="flex h-screen w-screen bg-slate-950 overflow-hidden text-slate-100 font-sans select-none">
-      <PlaybookSidebar
-        plays={plays}
-        currentPlayId={currentPlayId}
-        selectedPlayer={selectedPlayer}
-        onSelectPlay={(id) => {
-          setCurrentPlayId(id);
-          setSelectedPlayerId(null);
-          cancelDrawing();
-        }}
-        onNewPlay={handleNewPlay}
-        onSavePlay={() => localStorage.setItem('savedPlays', JSON.stringify(plays))}
-        onDeletePlay={handleDeletePlay}
-        onUpdatePlayName={handleUpdatePlayName}
-        onStartDrawing={startDrawing}
-        onClearRoutes={clearRoutes}
-        onAddPlayer={handleAddPlayer}
-        onUpdatePlayer={handleUpdatePlayer}
-        onSetFormation={handleFormation}
-        onApplyRoute={(preset) => handleApplyRoute(preset, activeRouteType)}
-        onSetPosition={handleSetPosition}
-        onExportPlaybook={handleExportPlaybook}
-        onImportPlaybook={handleImportPlaybook}
-        onCopyPlay={handleCopyPlay}
-        activeRouteType={activeRouteType}
-        onSetActiveRouteType={setActiveRouteType}
-        isDrawing={isDrawing}
-        onFinishDrawing={finishDrawing}
-        // Motion props
-        isSettingMotion={isSettingMotion}
-        onSetMotionMode={() => setIsSettingMotion(!isSettingMotion)}
-        onClearMotion={handleClearMotion}
-      />
+    <div className="h-screen flex flex-col bg-slate-950">
+      <main className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar */}
+        <PlaybookSidebar
+          plays={plays}
+          currentPlayId={currentPlayId}
+          selectedPlayer={selectedPlayer}
+          onSelectPlay={(id) => {
+            setCurrentPlayId(id);
+            setSelectedPlayerId(null);
+            cancelDrawing();
+          }}
+          onNewPlay={handleNewPlay}
+          onSavePlay={() => localStorage.setItem('savedPlays', JSON.stringify(plays))}
+          onDeletePlay={handleDeletePlay}
+          onUpdatePlayName={handleUpdatePlayName}
+          onStartDrawing={startDrawing}
+          onClearRoutes={clearRoutes}
+          onUpdatePlayer={handleUpdatePlayer}
+          onSetFormation={handleFormation}
+          onApplyRoute={(preset) => handleApplyRoute(preset, activeRouteType)}
+          onSetPosition={handleSetPosition}
+          onExportPlaybook={handleExportPlaybook}
+          onImportPlaybook={handleImportPlaybook}
+          onCopyPlay={handleCopyPlay}
+          activeRouteType={activeRouteType}
+          onSetActiveRouteType={setActiveRouteType}
+          isDrawing={isDrawing}
+          onFinishDrawing={finishDrawing}
+          // Motion props
+          isSettingMotion={isSettingMotion}
+          onSetMotionMode={() => setIsSettingMotion(!isSettingMotion)}
+          onClearMotion={handleClearMotion}
+        />
 
-      <main className="flex-1 flex flex-col items-center justify-center bg-slate-900 p-8 relative overflow-hidden">
-        <div className="absolute inset-0 bg-slate-950 z-0">
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900 via-slate-950 to-slate-950"></div>
-        </div>
-
-        <div className="z-10 flex flex-col items-center gap-4 h-full w-full justify-center">
-          <div className="text-slate-300 font-mono text-sm flex gap-4 items-center">
-            <span>{currentPlay ? currentPlay.name : "Select or create a play"}</span>
-            {currentPlay && <span className="text-slate-500">| {currentPlay.players.length} Players</span>}
-            {isDrawing && (
-              <span className="bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded text-xs animate-pulse border border-yellow-500/30">
-                DRAWING MODE (Click to add points, Enter to finish)
-              </span>
-            )}
-            {isSettingMotion && (
-              <span className="bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded text-xs animate-pulse border border-purple-500/30">
-                SELECT MOTION TARGET (Click another player)
-              </span>
-            )}
-          </div>
-
-          <div className="rounded-xl overflow-hidden shadow-2xl ring-1 ring-slate-700 p-1 bg-slate-800 relative">
-            <Field onClick={handleFieldClick} className={isDrawing ? 'cursor-crosshair' : isSettingMotion ? 'cursor-alias' : 'cursor-default'}>
+        {/* Center - Field */}
+        <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto">
+          <div className="p-8">
+            <Field
+              onClick={handleFieldClick}
+              className={isDrawing ? 'cursor-crosshair' : isSettingMotion ? 'cursor-alias' : 'cursor-default'}
+            >
               {/* Render Routes */}
               <svg className="absolute inset-0 pointer-events-none z-0" width="100%" height="100%">
                 {/* 0. Render Motion Lines */}
@@ -251,6 +249,22 @@ function App() {
             </Field>
           </div>
         </div>
+
+        {/* Right Sidebar - Playbook Grid */}
+        <PlaybookGrid
+          playbooks={playbooks}
+          currentPlaybookId={currentPlaybookId}
+          onSelectPlaybook={setCurrentPlaybookId}
+          onNewPlaybook={handleNewPlaybook}
+          onRenamePlaybook={handleRenamePlaybook}
+          onDeletePlaybook={handleDeletePlaybook}
+          plays={plays}
+          currentPlayId={currentPlayId}
+          columnNames={columnNames}
+          onUpdateColumnName={handleUpdateColumnName}
+          onAssignPlayToCell={handleAssignPlayToCell}
+          onRemovePlayFromCell={handleRemovePlayFromCell}
+        />
       </main>
     </div>
   )
