@@ -4,6 +4,8 @@ import { PlaybookSidebar } from '@/components/PlaybookSidebar'
 import { PlaybookGrid } from '@/components/PlaybookGrid'
 import { PlayerToken } from '@/components/PlayerToken'
 import { RoutePath } from '@/components/RoutePath'
+import { PrintModal, type PrintSettings } from '@/components/PrintModal'
+import { PrintView } from '@/components/PrintView'
 import type { Point, RouteType, RouteSegment } from '@/types'
 import { usePlaybook } from '@/hooks/usePlaybook'
 import { S, clampPoint } from '@/lib/constants'
@@ -19,6 +21,7 @@ function App() {
     handleRenamePlaybook,
     // Plays
     plays,
+    currentPlaybook,
     currentPlay,
     currentPlayId,
     setCurrentPlayId,
@@ -53,6 +56,19 @@ function App() {
   const [activeRouteType, setActiveRouteType] = useState<RouteType>('primary');
   const [drawingType, setDrawingType] = useState<RouteType>('primary');
   const [activeRoutePoints, setActiveRoutePoints] = useState<Point[]>([]);
+
+  // Print state
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printSettings, setPrintSettings] = useState<PrintSettings>({ playsPerPage: 4 });
+
+  const handlePrint = (settings: PrintSettings) => {
+    setPrintSettings(settings);
+    setIsPrintModalOpen(false);
+    // Delay print to allow the modal to close and PrintView to update
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
 
   const startDrawing = () => {
     if (!selectedPlayer) return;
@@ -264,8 +280,23 @@ function App() {
           onUpdateColumnName={handleUpdateColumnName}
           onAssignPlayToCell={handleAssignPlayToCell}
           onRemovePlayFromCell={handleRemovePlayFromCell}
+          onOpenPrintSettings={() => setIsPrintModalOpen(true)}
         />
       </main>
+
+      {/* Modals & Print Layers */}
+      <PrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        onPrint={handlePrint}
+      />
+
+      {currentPlaybook && (
+        <PrintView
+          playbook={currentPlaybook}
+          playsPerPage={printSettings.playsPerPage}
+        />
+      )}
     </div>
   )
 }

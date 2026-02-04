@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Grid3x3, Edit2, X, Plus, Trash2, BookOpen } from 'lucide-react';
+import { Grid3x3, Edit2, X, Plus, Trash2, BookOpen, Printer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Play, Playbook } from '@/types';
 import { MiniPlayPreview } from './MiniPlayPreview';
@@ -12,6 +12,7 @@ interface PlaybookGridProps {
     onNewPlaybook: () => void;
     onRenamePlaybook: (id: string, name: string) => void;
     onDeletePlaybook: (id: string) => void;
+    onOpenPrintSettings: () => void;
 
     // Grid management
     plays: Play[];
@@ -36,6 +37,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     onUpdateColumnName,
     onAssignPlayToCell,
     onRemovePlayFromCell,
+    onOpenPrintSettings,
     className
 }) => {
     const [editingColumn, setEditingColumn] = useState<number | null>(null);
@@ -82,9 +84,18 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
         <div className={cn("flex flex-col h-full bg-slate-900 text-white w-[400px] border-l border-slate-700 font-sans", className)}>
             {/* Header */}
             <div className="p-4 border-b border-slate-700 bg-slate-950/50 space-y-3">
-                <h2 className="text-xl font-bold flex items-center gap-2 text-emerald-400">
-                    <BookOpen size={20} /> Playbooks
-                </h2>
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold flex items-center gap-2 text-emerald-400">
+                        <BookOpen size={20} /> Playbooks
+                    </h2>
+                    <button
+                        onClick={onOpenPrintSettings}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded-lg shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2 text-sm font-bold"
+                        title="Print Playbook"
+                    >
+                        <Printer size={16} /> Print
+                    </button>
+                </div>
 
                 {/* Playbook Selector */}
                 <div className="space-y-2">

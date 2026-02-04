@@ -10,17 +10,42 @@ interface MiniPlayPreviewProps {
 
 export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
     play,
-    width = 100,
+    width = 51,
     height = 70,
     className = ''
 }) => {
-    // Scale factor to fit the field into the mini preview
-    // Original field is 625px wide × 625px tall (25 yards @ 25px/yard)
-    const SCALE_X = width / 625;
-    const SCALE_Y = height / 625;
+    // Field dimensions (25 yards wide @ 25px/yard)
+    const VIRTUAL_WIDTH = 625;
+    const VIRTUAL_HEIGHT = 625; // Full field depth
+    const Y_START = 0;
 
-    // Line of scrimmage position (in original coordinates, LOS is at y=500)
-    const LOS_Y = 500 * SCALE_Y;
+    // Scale factors
+    const SCALE_X = width / VIRTUAL_WIDTH;
+    const SCALE_Y = height / VIRTUAL_HEIGHT;
+
+    // Helper to get scaled and shifted coordinates
+    const getX = (x: number) => x * SCALE_X;
+    const getY = (y: number) => (y - Y_START) * SCALE_Y;
+
+    // Field positions (following constants.ts logic)
+    const getYFromLOS = (yardsFromLOS: number) => {
+        // LOS is 5 yards from bottom. Total height is 25y.
+        // yardsFromBottom = 5 + yardsFromLOS
+        // yardsFromTop = 25 - yardsFromBottom
+        const yardsFromBottom = 5 + yardsFromLOS;
+        const yardsFromTop = 25 - yardsFromBottom;
+        return getY(yardsFromTop * 25); // 25px per yard in virtual space
+    };
+
+    const LOS_Y = getYFromLOS(0);
+
+    // Flatten all routes to sort them by type (primary routes on top)
+    const allRoutes = play.players.flatMap(player =>
+        player.routes.map(route => ({ route, player }))
+    ).sort((a, b) => {
+        const order = { 'check': 0, 'option': 1, 'endzone': 2, 'primary': 3 };
+        return (order[a.route.type as keyof typeof order] || 0) - (order[b.route.type as keyof typeof order] || 0);
+    });
 
     return (
         <svg
@@ -30,94 +55,137 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
             className={className}
         >
             {/* Field background */}
-            <rect
-                x="0"
-                y="0"
-                width={width}
-                height={height}
-                fill="white"
-                rx="1"
-            />
+            <rect x="0" y="0" width={width} height={height} fill="white" rx="1" />
 
-            {/* Line of scrimmage */}
+            {/* Yard Markings (Matching Field.tsx) */}
+            {/* 10 Yard Line (Full Width) */}
             <line
-                x1="0"
-                y1={LOS_Y}
-                x2={width}
-                y2={LOS_Y}
-                stroke="#2563eb"
-                strokeWidth="1"
+                x1="0" y1={getYFromLOS(10)} x2={width} y2={getYFromLOS(10)}
+                stroke="#94a3b8" strokeWidth="0.5"
             />
 
-            {/* Render players and routes */}
-            {play.players.map((player) => {
-                const startX = player.position.x * SCALE_X;
-                const startY = player.position.y * SCALE_Y;
+            {/* 7 Yard Marks (Side lines) */}
+            <line x1="0" y1={getYFromLOS(7)} x2={getX(30)} y2={getYFromLOS(7)} stroke="#94a3b8" strokeWidth="0.5" />
+            <line x1={getX(625 - 30)} y1={getYFromLOS(7)} x2={width} y2={getYFromLOS(7)} stroke="#94a3b8" strokeWidth="0.5" />
+
+            {/* 5 Yard Marks (Side lines) */}
+            <line x1="0" y1={getYFromLOS(5)} x2={getX(15)} y2={getYFromLOS(5)} stroke="#94a3b8" strokeWidth="0.5" />
+            <line x1={getX(625 - 15)} y1={getYFromLOS(5)} x2={width} y2={getYFromLOS(5)} stroke="#94a3b8" strokeWidth="0.5" />
+
+            {/* Line of scrimmage (Black) */}
+            <line
+                x1="0" y1={LOS_Y} x2={width} y2={LOS_Y}
+                stroke="#000000" strokeWidth="0.5"
+            />
+
+            {/* 1. Motion paths */}
+            {play.players.map(player => {
+                if (!player.motion) return null;
+
+                const offset = 25;
+                const startX = getX(player.position.x);
+                const startY = getY(player.position.y);
+                const endX = getX(player.motion.x);
+                const endY = getY(player.motion.y);
+
+                const startDipY = getY(player.position.y + offset);
+                const endDipY = getY(player.motion.y + offset);
 
                 return (
-                    <g key={player.id}>
-                        {/* Routes */}
-                        {player.routes.map((route) => {
-                            const pathData = route.points
-                                .map((point, idx) => {
-                                    const x = point.x * SCALE_X;
-                                    const y = point.y * SCALE_Y;
-                                    return idx === 0 ? `M ${x} ${y}` : `L ${x} ${y}`;
-                                })
-                                .join(' ');
+                    <polyline
+                        key={`motion-${player.id}`}
+                        points={[
+                            `${startX},${startY}`,
+                            `${startX},${startDipY}`,
+                            `${endX},${endDipY}`,
+                            `${endX},${endY}`
+                        ].join(' ')}
+                        stroke={player.color}
+                        strokeWidth="1.2"
+                        strokeOpacity="0.5"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                );
+            })}
 
-                            // Route color follows the same logic as RoutePath.tsx
-                            const routeColor =
-                                route.type === 'check' ? '#000000' :
-                                    route.type === 'endzone' ? '#f472b6' :
-                                        player.color;
+            {/* 2. Routes */}
+            {allRoutes.map(({ route, player }) => {
+                const lastPoint = route.points[route.points.length - 1];
+                const secondLast = route.points[route.points.length - 2];
 
-                            // Dash array logic from RoutePath.tsx
-                            const strokeDasharray =
-                                route.type === 'option' ? '1.5,1.5' :
-                                    route.type === 'endzone' ? '2.5,1.5' : 'none';
+                let arrowhead = null;
+                const routeColor = route.type === 'check' ? '#000000' :
+                    route.type === 'endzone' ? '#f472b6' : player.color;
 
-                            return (
-                                <path
-                                    key={route.id}
-                                    d={pathData}
-                                    stroke={routeColor}
-                                    strokeWidth="0.8"
-                                    fill="none"
-                                    opacity={route.type === 'check' ? 0.6 : 1}
-                                    strokeDasharray={strokeDasharray}
-                                />
-                            );
-                        })}
+                if (secondLast && lastPoint) {
+                    const lpx = getX(lastPoint.x);
+                    const lpy = getY(lastPoint.y);
+                    const slx = getX(secondLast.x);
+                    const sly = getY(secondLast.y);
 
-                        {/* Motion path */}
-                        {player.motion && (
-                            <polyline
-                                points={[
-                                    `${startX},${startY}`,
-                                    `${startX},${startY + 5 * SCALE_Y}`,
-                                    `${player.motion.x * SCALE_X},${player.motion.y * SCALE_Y + 5 * SCALE_Y}`,
-                                    `${player.motion.x * SCALE_X},${player.motion.y * SCALE_Y}`
-                                ].join(' ')}
-                                stroke={player.color}
-                                strokeWidth="0.8"
-                                strokeOpacity="0.5"
-                                fill="none"
-                            />
-                        )}
+                    const dx = lpx - slx;
+                    const dy = lpy - sly;
+                    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                    const length = Math.sqrt(dx * dx + dy * dy);
 
-                        {/* Player dot */}
-                        <circle
-                            cx={player.motion ? player.motion.x * SCALE_X : startX}
-                            cy={player.motion ? player.motion.y * SCALE_Y : startY}
-                            r="1.5"
-                            fill={player.color}
-                            stroke="#1e293b"
-                            strokeWidth="0.3"
+                    const arrowPush = 1.5;
+                    const ux = dx / length;
+                    const uy = dy / length;
+                    const tipX = lpx + (ux * arrowPush);
+                    const tipY = lpy + (uy * arrowPush);
+
+                    const arrowSize = 3;
+                    arrowhead = (
+                        <path
+                            d={`M -${arrowSize} -${arrowSize / 2} L 0 0 L -${arrowSize} ${arrowSize / 2}`}
+                            fill="none"
+                            stroke={routeColor}
+                            strokeWidth="1.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            transform={`translate(${tipX}, ${tipY}) rotate(${angle})`}
                         />
+                    );
+                }
+
+                const pathData = route.points
+                    .map((point, idx) => idx === 0 ? `M ${getX(point.x)} ${getY(point.y)}` : `L ${getX(point.x)} ${getY(point.y)}`)
+                    .join(' ');
+
+                const strokeDasharray = route.type === 'option' ? '1.5,1.5' :
+                    route.type === 'endzone' ? '3,2' : 'none';
+
+                return (
+                    <g key={route.id}>
+                        <path
+                            d={pathData}
+                            stroke={routeColor}
+                            strokeWidth="1.2"
+                            fill="none"
+                            opacity={route.type === 'check' ? 0.7 : 1}
+                            strokeDasharray={strokeDasharray}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                        {arrowhead}
                     </g>
                 );
             })}
+
+            {/* 3. Player dots */}
+            {play.players.map(player => (
+                <circle
+                    key={`player-${player.id}`}
+                    cx={getX(player.position.x)}
+                    cy={getY(player.position.y)}
+                    r="1.8"
+                    fill={player.color}
+                    stroke="#000000"
+                    strokeWidth="0.5"
+                />
+            ))}
         </svg>
     );
 };
