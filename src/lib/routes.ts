@@ -15,7 +15,10 @@ export type RoutePreset =
     | 'corner'
     | 'go'
     | 'comeback'
-    | 'cross';
+    | 'cross'
+    | 'cross-out'
+    | 'fast-out'
+    | 'fast-in';
 
 export const ROUTE_PRESETS: { label: string; value: RoutePreset }[] = [
     { label: 'Stop', value: 'hitch' },
@@ -32,6 +35,9 @@ export const ROUTE_PRESETS: { label: string; value: RoutePreset }[] = [
     { label: 'Comeback', value: 'comeback' },
     { label: 'Corner', value: 'corner' },
     { label: 'Cross', value: 'cross' },
+    { label: 'CrossOut', value: 'cross-out' },
+    { label: 'FastOut', value: 'fast-out' },
+    { label: 'FastIn', value: 'fast-in' },
 ];
 
 export const generateRoutePoints = (start: Point, preset: RoutePreset): Point[] => {
@@ -78,7 +84,12 @@ export const generateRoutePoints = (start: Point, preset: RoutePreset): Point[] 
     switch (preset) {
         case 'cross':
             addAbsDepth(0, 1);
-            addRel(20 * dirIn, 3);
+            addRel(20 * dirIn, 4);
+            break;
+        case 'cross-out':
+            addAbsDepth(0, 1);
+            addRel(7 * dirIn, 1.5);
+            addRel(5 * -dirIn, 2);
             break;
         case 'hitch':
             // Go to 5 yards depth directly
@@ -135,6 +146,16 @@ export const generateRoutePoints = (start: Point, preset: RoutePreset): Point[] 
             addAbsDepth(0, 7);
             addRel(1 * dirOut, 7);
             addRel(1 * dirOut, -2);
+            break;
+        case 'fast-out':
+            addAbsDepth(0, 3);
+            addRel(2 * dirOut, 2);
+            addRel(4 * dirOut, 0);
+            break;
+        case 'fast-in':
+            addAbsDepth(0, 3);
+            addRel(2 * -dirOut, 2);
+            addRel(4 * -dirOut, 0);
             break;
     }
 
