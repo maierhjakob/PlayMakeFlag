@@ -2,14 +2,14 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface FieldProps extends React.HTMLAttributes<HTMLDivElement> {
-    // We might add props for editable state, etc.
+    showRaster?: boolean;
 }
 
 export const FIELD_WIDTH_YARDS = 25; // Standard width
 export const TOTAL_LENGTH_YARDS = 25; // Compact field: 5yd backfield + 20yd play area
 export const YARD_TO_PX = 25; // Larger scale since field is smaller dimensions
 
-export const Field: React.FC<FieldProps> = ({ className, children, ...props }) => {
+export const Field: React.FC<FieldProps> = ({ className, children, showRaster, ...props }) => {
     const widthPx = FIELD_WIDTH_YARDS * YARD_TO_PX;
     const heightPx = TOTAL_LENGTH_YARDS * YARD_TO_PX;
 
@@ -36,9 +36,14 @@ export const Field: React.FC<FieldProps> = ({ className, children, ...props }) =
             {/* Field Markings */}
             <svg width="100%" height="100%" className="absolute inset-0 pointer-events-none opacity-80">
                 <defs>
-                    <pattern id="grass" patternUnits="userSpaceOnUse" width="100" height="100">
+                    <pattern id="yardGrid" width={YARD_TO_PX} height={YARD_TO_PX} patternUnits="userSpaceOnUse">
+                        <path d={`M ${YARD_TO_PX} 0 L 0 0 0 ${YARD_TO_PX}`} fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="1" />
                     </pattern>
                 </defs>
+
+                {showRaster && (
+                    <rect width="100%" height="100%" fill="url(#yardGrid)" />
+                )}
 
                 {/* Line of Scrimmage (LOS) - Blue Line */}
                 <line x1="0" y1={getLineY(0)} x2="100%" y2={getLineY(0)} stroke="#2563eb" strokeWidth="3" />

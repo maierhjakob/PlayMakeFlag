@@ -57,6 +57,21 @@ function App() {
   const [drawingType, setDrawingType] = useState<RouteType>('primary');
   const [activeRoutePoints, setActiveRoutePoints] = useState<Point[]>([]);
 
+  // Draggable point state
+  const [draggedPoint, setDraggedPoint] = useState<{
+    playerId: string;
+    routeId: string;
+    pointIndex: number;
+  } | null>(null);
+
+  const snapToGrid = (p: Point): Point => {
+    const snap = S / 2;
+    return {
+      x: Math.round(p.x / snap) * snap,
+      y: Math.round(p.y / snap) * snap
+    };
+  };
+
   // Print state
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printSettings, setPrintSettings] = useState<PrintSettings>({ playsPerPage: 4 });
@@ -115,7 +130,13 @@ function App() {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    addToRoute({ x, y });
+
+    // Snap to 0.5 yards (S is pixels per yard)
+    const snap = S / 2;
+    const snappedX = Math.round(x / snap) * snap;
+    const snappedY = Math.round(y / snap) * snap;
+
+    addToRoute({ x: snappedX, y: snappedY });
   };
 
   const handleExportPlaybook = () => {
@@ -142,6 +163,34 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isDrawing, activeRoutePoints, setSelectedPlayerId]);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!draggedPoint || !currentPlay) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const snapped = snapToGrid({ x, y });
+
+    const updatedPlayers = currentPlay.players.map(p => {
+      if (p.id !== draggedPoint.playerId) return p;
+      return {
+        ...p,
+        routes: p.routes.map(r => {
+          if (r.id !== draggedPoint.routeId) return r;
+          const newPoints = [...r.points];
+          newPoints[draggedPoint.pointIndex] = clampPoint(snapped);
+          return { ...r, points: newPoints };
+        })
+      };
+    });
+
+    updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
+  };
+
+  const handleMouseUp = () => {
+    setDraggedPoint(null);
+  };
 
   return (
     <div className="h-screen flex flex-col bg-slate-950">
@@ -184,7 +233,11 @@ function App() {
           <div className="p-8">
             <Field
               onClick={handleFieldClick}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
               className={isDrawing ? 'cursor-crosshair' : isSettingMotion ? 'cursor-alias' : 'cursor-default'}
+              showRaster={isDrawing || isSettingMotion || !!draggedPoint}
             >
               {/* Render Routes */}
               <svg className="absolute inset-0 pointer-events-none z-0" width="100%" height="100%">
@@ -247,6 +300,34 @@ function App() {
                   />
                 )}
               </svg>
+
+              {/* Render Draggable Handles for Selected Player */}
+              {selectedPlayer && !isDrawing && (
+                <svg className="absolute inset-0 pointer-events-none z-20" width="100%" height="100%">
+                  {selectedPlayer.routes.map(route => (
+                    route.points.map((point, idx) => (
+                      <circle
+                        key={`${route.id}-${idx}`}
+                        cx={point.x}
+                        cy={point.y}
+                        r={6}
+                        fill="white"
+                        stroke={selectedPlayer.color}
+                        strokeWidth={2}
+                        className="pointer-events-auto cursor-move hover:r-8 transition-all"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setDraggedPoint({
+                            playerId: selectedPlayer.id,
+                            routeId: route.id,
+                            pointIndex: idx
+                          });
+                        }}
+                      />
+                    ))
+                  ))}
+                </svg>
+              )}
 
               {currentPlay?.players.map(player => (
                 <PlayerToken
