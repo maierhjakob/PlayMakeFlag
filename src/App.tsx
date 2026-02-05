@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Field } from '@/components/Field'
 import { PlaybookSidebar } from '@/components/PlaybookSidebar'
 import { PlaybookGrid } from '@/components/PlaybookGrid'
@@ -63,6 +63,7 @@ function App() {
     routeId: string;
     pointIndex: number;
   } | null>(null);
+  const wasDraggingRef = useRef(false);
 
   const snapToGrid = (p: Point): Point => {
     const snap = S / 2;
@@ -123,6 +124,10 @@ function App() {
   };
 
   const handleFieldClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (wasDraggingRef.current) {
+      wasDraggingRef.current = false;
+      return;
+    }
     if (!isDrawing) {
       if (selectedPlayerId) setSelectedPlayerId(null);
       return;
@@ -167,6 +172,7 @@ function App() {
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!draggedPoint || !currentPlay) return;
 
+    wasDraggingRef.current = true;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
