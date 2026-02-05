@@ -98,13 +98,14 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                     }
 
                     .print-grid-table {
-                        flex: 1;
+                        height: 100%;
                         display: flex;
                         flex-direction: column;
                     }
 
                     .print-grid-row {
-                        flex: 1;
+                        height: 1.325cm;
+                        flex: none;
                         display: flex;
                         border-bottom: 1px solid #333;
                     }
