@@ -21,6 +21,7 @@ interface PlaybookGridProps {
     onUpdateColumnName: (index: number, name: string) => void;
     onAssignPlayToCell: (playId: string, row: number, col: number) => void;
     onRemovePlayFromCell: (row: number, col: number) => void;
+    onSelectPlay: (id: string) => void;
     className?: string;
 }
 
@@ -37,6 +38,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     onUpdateColumnName,
     onAssignPlayToCell,
     onRemovePlayFromCell,
+    onSelectPlay,
     onOpenPrintSettings,
     className
 }) => {
@@ -55,13 +57,12 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     };
 
     const handleCellClick = (row: number, col: number) => {
-        if (!currentPlayId) return;
-
         const existingPlay = getPlayAtCell(row, col);
+
         if (existingPlay) {
-            // Cell occupied - remove the play from this cell
-            onRemovePlayFromCell(row, col);
-        } else {
+            // Cell occupied - select the play
+            onSelectPlay(existingPlay.id);
+        } else if (currentPlayId) {
             // Assign current play to this cell
             onAssignPlayToCell(currentPlayId, row, col);
         }
@@ -272,7 +273,16 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                                                 <span className="text-[9px] truncate w-full px-0.5 text-center leading-tight">
                                                     {play.name}
                                                 </span>
-                                                <X size={10} className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 bg-slate-900/80 rounded-full p-0.5" />
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onRemovePlayFromCell(rowIndex, colIndex);
+                                                    }}
+                                                    className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 bg-slate-900/80 rounded-full p-0.5 hover:bg-red-900/20"
+                                                    title="Remove from grid"
+                                                >
+                                                    <X size={10} />
+                                                </button>
                                             </>
                                         ) : currentPlayId ? (
                                             <span className="text-[10px] opacity-50">Click to assign</span>

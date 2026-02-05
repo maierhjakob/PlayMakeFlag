@@ -361,6 +361,11 @@ function App() {
           onUpdateColumnName={handleUpdateColumnName}
           onAssignPlayToCell={handleAssignPlayToCell}
           onRemovePlayFromCell={handleRemovePlayFromCell}
+          onSelectPlay={(id) => {
+            setCurrentPlayId(id);
+            setSelectedPlayerId(null);
+            cancelDrawing();
+          }}
           onOpenPrintSettings={() => setIsPrintModalOpen(true)}
         />
       </main>
