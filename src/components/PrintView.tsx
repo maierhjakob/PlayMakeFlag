@@ -40,8 +40,6 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                                 <div className="print-grid-cell print-grid-row-num">{r + 1}</div>
                                 {Array.from({ length: COLS }).map((_, c) => {
                                     const play = getPlayAtCell(r, c);
-                                    const colName = playbook.gridConfig.columnNames[c];
-                                    const label = `${r + 1}${colName}`;
 
                                     return (
                                         <div key={c} className="print-grid-cell print-grid-play-cell">
