@@ -24,7 +24,7 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                     <div className="print-grid-table">
                         {/* Column Headers */}
                         <div className="print-grid-row print-grid-header">
-                            <div className="print-grid-cell print-grid-row-num print-grid-corner">
+                            <div className="print-grid-cell print-grid-row-num print-grid-corner" style={{ fontSize: '4pt' }}>
                                 {playbook.name}
                             </div>
                             {playbook.gridConfig.columnNames.map((name, i) => (
@@ -46,8 +46,9 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                                                 <div className="print-play-box">
                                                     <MiniPlayPreview
                                                         play={play}
-                                                        width={75}
-                                                        height={50}
+                                                        width={100}
+                                                        height={92}
+                                                        strokeWidth={2.0}
                                                         className="print-mini-preview"
                                                     />
                                                 </div>
@@ -104,7 +105,7 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                     }
 
                     .print-grid-row {
-                        height: 1.325cm;
+                        height: 1.4cm;
                         flex: none;
                         display: flex;
                         border-bottom: 1px solid #333;
@@ -127,9 +128,9 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                     }
 
                     .print-grid-row-num {
-                        width: 1cm;
+                        width: 0.5cm;
                         font-weight: bold;
-                        font-size: 8pt;
+                        font-size: 7pt;
                         background: #f0f0f0;
                         -webkit-print-color-adjust: exact;
                     }
@@ -160,7 +161,7 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                     }
 
                     .print-grid-header {
-                        height: 0.7cm;
+                        height: 0.4cm;
                         flex: none;
                     }
 
