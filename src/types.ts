@@ -24,6 +24,12 @@ export type Player = {
     motion?: Point | null;
 };
 
+export type PlayTag = {
+    id: string;
+    text: string;
+    color: string;
+};
+
 export interface Play {
     id: string;
     name: string;
@@ -34,6 +40,7 @@ export interface Play {
         column: number; // 0-4 (for columns A-E)
     };
     ballPosition?: Point;
+    tags?: PlayTag[];
 }
 
 export interface PlaybookGrid {

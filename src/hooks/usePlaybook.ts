@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { Playbook, Play, Player, Point, RouteSegment, RouteType } from '@/types';
+import type { Playbook, Play, Player, Point, RouteSegment, RouteType, PlayTag } from '@/types';
 import { POSITIONS, getPos, clampPoint } from '@/lib/constants';
 import { generateRoutePoints } from '@/lib/routes';
 import type { RoutePreset } from '@/lib/routes';
@@ -208,6 +208,13 @@ export function usePlaybook() {
         updateCurrentPlaybook(pb => ({
             ...pb,
             plays: pb.plays.map(p => p.id === id ? { ...p, name } : p)
+        }));
+    };
+
+    const handleUpdatePlayTags = (id: string, tags: PlayTag[]) => {
+        updateCurrentPlaybook(pb => ({
+            ...pb,
+            plays: pb.plays.map(p => p.id === id ? { ...p, tags } : p)
         }));
     };
 
@@ -534,6 +541,7 @@ export function usePlaybook() {
         handleDeletePlay,
         handleCopyPlay,
         handleUpdatePlayName,
+        handleUpdatePlayTags,
 
         // Player actions
         handleUpdatePlayer,

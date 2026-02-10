@@ -3,7 +3,7 @@ import { Plus, Trash2, Save, FolderOpen, MousePointer2, Copy, MoveRight } from '
 import { ROUTE_PRESETS } from '@/lib/routes';
 import { getPos, S } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { Play, Player } from '@/types';
+import type { Play, Player, PlayTag } from '@/types';
 
 interface PlaybookSidebarProps {
     plays: Play[];
@@ -14,6 +14,7 @@ interface PlaybookSidebarProps {
     onSavePlay: () => void;
     onDeletePlay: (id: string) => void;
     onUpdatePlayName: (id: string, name: string) => void;
+    onUpdatePlayTags: (id: string, tags: PlayTag[]) => void;
     onStartDrawing: (type: 'primary' | 'option' | 'check' | 'endzone') => void;
     onClearRoutes: () => void;
     onUpdatePlayer: (id: string, updates: Partial<Player>) => void;
@@ -43,6 +44,7 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     onSavePlay,
     onDeletePlay,
     onUpdatePlayName,
+    onUpdatePlayTags,
     onStartDrawing,
     onClearRoutes,
     onUpdatePlayer,
@@ -120,6 +122,64 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                             className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
                             placeholder="Enter play name..."
                         />
+                    </div>
+                )}
+
+                {/* Play Tags Editor */}
+                {currentPlayId && (
+                    <div className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-[10px] text-slate-500 uppercase font-semibold">Play Tags (Markers)</label>
+                            <button
+                                onClick={() => {
+                                    const currentPlay = plays.find(p => p.id === currentPlayId);
+                                    const currentTags = currentPlay?.tags || [];
+                                    onUpdatePlayTags(currentPlayId, [
+                                        ...currentTags,
+                                        { id: crypto.randomUUID(), text: 'T', color: '#ec4899' }
+                                    ]);
+                                }}
+                                className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 font-semibold"
+                            >
+                                <Plus size={10} /> Add Tag
+                            </button>
+                        </div>
+                        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                            {(plays.find(p => p.id === currentPlayId)?.tags || []).map((tag, idx) => (
+                                <div key={tag.id} className="flex gap-1.5 items-center">
+                                    <input
+                                        type="text"
+                                        value={tag.text}
+                                        maxLength={2}
+                                        onChange={(e) => {
+                                            const currentTags = [...(plays.find(p => p.id === currentPlayId)?.tags || [])];
+                                            currentTags[idx] = { ...tag, text: e.target.value };
+                                            onUpdatePlayTags(currentPlayId, currentTags);
+                                        }}
+                                        className="w-8 bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-xs text-white font-bold"
+                                    />
+                                    <input
+                                        type="color"
+                                        value={tag.color}
+                                        onChange={(e) => {
+                                            const currentTags = [...(plays.find(p => p.id === currentPlayId)?.tags || [])];
+                                            currentTags[idx] = { ...tag, color: e.target.value };
+                                            onUpdatePlayTags(currentPlayId, currentTags);
+                                        }}
+                                        className="w-10 h-6 bg-slate-900 border border-slate-700 rounded cursor-pointer p-0.5"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            const currentTags = (plays.find(p => p.id === currentPlayId)?.tags || []).filter(t => t.id !== tag.id);
+                                            onUpdatePlayTags(currentPlayId, currentTags);
+                                        }}
+                                        className="text-slate-500 hover:text-red-400 transition-colors"
+                                    >
+                                        <Trash2 size={12} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>

@@ -40,17 +40,31 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                                 <div className="print-grid-cell print-grid-row-num">{r + 1}</div>
                                 {Array.from({ length: COLS }).map((_, c) => {
                                     const play = getPlayAtCell(r, c);
+                                    const colName = playbook.gridConfig.columnNames[c];
+                                    const label = `${r + 1}${colName}`;
+
                                     return (
                                         <div key={c} className="print-grid-cell print-grid-play-cell">
                                             {play && (
                                                 <div className="print-play-box">
                                                     <MiniPlayPreview
                                                         play={play}
-                                                        width={100}
+                                                        width={115}
                                                         height={92}
                                                         strokeWidth={2.0}
                                                         className="print-mini-preview"
                                                     />
+                                                    <div className="print-play-label-container">
+                                                        {play.tags?.map(tag => (
+                                                            <div
+                                                                key={tag.id}
+                                                                className="print-custom-tag"
+                                                                style={{ color: tag.color }}
+                                                            >
+                                                                {tag.text}
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -167,17 +181,45 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
 
                     .print-play-box {
                         display: flex;
-                        flex-direction: column;
+                        flex-direction: row;
                         align-items: center;
-                        justify-content: center;
+                        justify-content: space-between;
                         width: 100%;
                         height: 100%;
-                        padding: 1px;
+                        padding: 0 2px;
                     }
 
                     .print-mini-preview {
-                        max-width: 98%;
+                        flex: 1;
+                        max-width: 95%;
                         max-height: 98%;
+                    }
+
+                    .print-play-label-container {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 1px;
+                        width: 8px;
+                        height: 100%;
+                        box-shadow: inset 0.5px 0 0 rgba(0,0,0,0.4);
+                        background: #fff;
+                    }
+
+                    .print-play-label {
+                        font-family: sans-serif;
+                        font-weight: 900;
+                        font-size: 11pt;
+                        color: #000;
+                        line-height: 1;
+                    }
+
+                    .print-custom-tag {
+                        font-family: sans-serif;
+                        font-weight: 900;
+                        font-size: 8pt;
+                        line-height: 1;
+                        text-align: right;
                     }
                 }
             `}</style>

@@ -34,6 +34,7 @@ function App() {
     handleDeletePlay,
     handleCopyPlay,
     handleUpdatePlayName,
+    handleUpdatePlayTags,
     handleUpdatePlayer,
     handleSetPosition,
     handleFormation,
@@ -215,6 +216,7 @@ function App() {
           onSavePlay={() => localStorage.setItem('savedPlays', JSON.stringify(plays))}
           onDeletePlay={handleDeletePlay}
           onUpdatePlayName={handleUpdatePlayName}
+          onUpdatePlayTags={handleUpdatePlayTags}
           onStartDrawing={startDrawing}
           onClearRoutes={clearRoutes}
           onUpdatePlayer={handleUpdatePlayer}
