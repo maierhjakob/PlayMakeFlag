@@ -270,9 +270,22 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                                                     height={56}
                                                     className="rounded"
                                                 />
-                                                <span className="text-[9px] truncate w-full px-0.5 text-center leading-tight">
-                                                    {play.name}
-                                                </span>
+                                                <div className="flex items-center gap-1 w-full px-1 overflow-hidden mt-0.5">
+                                                    <span className="text-[9px] truncate flex-1 leading-tight text-center">
+                                                        {play.name}
+                                                    </span>
+                                                    <div className="flex gap-0.5 shrink-0">
+                                                        {play.tags?.map(tag => (
+                                                            <div
+                                                                key={tag.id}
+                                                                className="w-2.5 h-2.5 rounded-[1px] flex items-center justify-center text-[6px] font-black text-white shadow-sm"
+                                                                style={{ backgroundColor: tag.color }}
+                                                            >
+                                                                {tag.text.slice(0, 1)}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
