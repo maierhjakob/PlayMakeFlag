@@ -151,8 +151,8 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
                     .map((point, idx) => idx === 0 ? `M ${getX(point.x)} ${getY(point.y)}` : `L ${getX(point.x)} ${getY(point.y)}`)
                     .join(' ');
 
-                const strokeDasharray = route.type === 'option' ? `${strokeWidth * 1.25},${strokeWidth * 1.25}` :
-                    route.type === 'endzone' ? `${strokeWidth * 2.5},${strokeWidth * 1.66}` : 'none';
+                const strokeDasharray = route.type === 'option' ? `${strokeWidth * 1},${strokeWidth * 2}` :
+                    route.type === 'endzone' ? `${strokeWidth * 1.5},${strokeWidth * 2.5}` : 'none';
 
                 return (
                     <g key={route.id}>
