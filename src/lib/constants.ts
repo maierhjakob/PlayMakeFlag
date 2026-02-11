@@ -34,7 +34,7 @@ export const clampPoint = (p: { x: number, y: number }) => {
 /* Player Positions Constants */
 export const POSITIONS = {
     'C': { role: 'C', label: '', x: 0, depth: -1, color: '#eab308' }, // Yellow
-    'QB': { role: 'QB', label: '', x: 0, depth: -4, color: '#ef4444' }, // Keep Red/Default? Or maybe neutral? User didn't specify.
+    'QB': { role: 'QB', label: '', x: 0, depth: -4, color: '#999999' }, // Gray
     'WR-L': { role: 'WR-L', label: '', x: -10, depth: -1, color: '#3b82f6' }, // Blue (LR)
     'WR-R': { role: 'WR-R', label: '', x: 10, depth: -1, color: '#ef4444' }, // Red (RR)
     'SL': { role: 'SL', label: '', x: -5, depth: -1, color: '#22c55e' }, // Green (Slot)
