@@ -200,7 +200,6 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                         gap: 1px;
                         width: 8px;
                         height: 100%;
-                        box-shadow: inset 0.5px 0 0 rgba(0,0,0,0.4);
                         background: #fff;
                     }
 
@@ -218,6 +217,7 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                         font-size: 8pt;
                         line-height: 1;
                         text-align: right;
+                        print-color-adjust: exact;
                     }
                 }
             `}</style>
