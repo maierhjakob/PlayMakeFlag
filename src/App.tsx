@@ -66,6 +66,7 @@ function App() {
     pointIndex: number;
   } | null>(null);
   const wasDraggingRef = useRef(false);
+  const lastHandledHashRef = useRef<string | null>(null);
 
   const snapToGrid = (p: Point): Point => {
     const snap = S / 2;
@@ -146,23 +147,25 @@ function App() {
     addToRoute({ x: snappedX, y: snappedY });
   };
 
-  const handleExportPlaybook = () => {
+  const handleExportPlaybook = async () => {
     try {
-      // Export the whole playbook object instead of just the plays array
-      // This preserves metadata like the playbook name and grid configuration
       const data = JSON.stringify(currentPlaybook);
-      // UTF-8 safe base64 encoding
-      const base64 = btoa(encodeURIComponent(data).replace(/%([0-9A-F]{2})/g, (_, p1) => {
-        return String.fromCharCode(parseInt(p1, 16));
-      }));
+
+      // Use native CompressionStream to shorten the URL
+      const stream = new Blob([data]).stream().pipeThrough(new CompressionStream('deflate'));
+      const compressedResponse = new Response(stream);
+      const compressedBuffer = await compressedResponse.arrayBuffer();
+
+      // Convert buffer to base64
+      const binary = String.fromCharCode(...new Uint8Array(compressedBuffer));
+      const base64 = btoa(binary);
 
       const shareUrl = `${window.location.origin}${window.location.pathname}#share=${base64}`;
 
       navigator.clipboard.writeText(shareUrl).then(() => {
-        alert("Shareable link copied to clipboard!");
+        alert("Compressed share link copied to clipboard!");
       }).catch(err => {
         console.error('Failed to copy link: ', err);
-        // Fallback: still show the prompt or a way to get it
         prompt("Copy this link to share:", shareUrl);
       });
     } catch (e) {
@@ -185,26 +188,39 @@ function App() {
 
   // Handle shareable links on mount
   useEffect(() => {
-    const handleHashChange = () => {
+    const handleHashChange = async () => {
       const hash = window.location.hash;
       if (hash.startsWith('#share=')) {
+        // Prevent double prompts (especially in development / strict mode or due to dependency changes)
+        if (lastHandledHashRef.current === hash) return;
+        lastHandledHashRef.current = hash;
+
         const base64 = hash.replace('#share=', '');
         try {
-          // UTF-8 safe base64 decoding
-          const jsonString = decodeURIComponent(Array.prototype.map.call(atob(base64), (c: string) => {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-          }).join(''));
+          // Decode base64 to bytes
+          const binary = atob(base64);
+          const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+
+          // Decompress using native DecompressionStream
+          const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+          const decompressedResponse = new Response(stream);
+          const jsonString = await decompressedResponse.text();
 
           if (window.confirm("A playbook has been shared with you. Would you like to import it?")) {
             const success = handleImportData(jsonString);
             if (success) {
-              // Clear the hash without reloading
+              // Clear the hash without reloading and reset the ref
               window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              lastHandledHashRef.current = null;
             }
+          } else {
+            // If they cancel, still don't prompt again for THIS hash until it changes
+            // Note: Clear logic might be needed if they want to import LATER, 
+            // but usually a click is needed to re-trigger.
           }
         } catch (e) {
           console.error("Failed to decode shared playbook", e);
-          alert("The shared link is invalid or corrupted.");
+          alert("The shared link is invalid, corrupted, or used an older version.");
         }
       }
     };

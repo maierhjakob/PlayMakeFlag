@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Playbook, Play, Player, Point, RouteSegment, RouteType, PlayTag } from '@/types';
 import { POSITIONS, getPos, clampPoint } from '@/lib/constants';
 import { generateRoutePoints } from '@/lib/routes';
@@ -431,7 +431,7 @@ export function usePlaybook() {
     // IMPORT/EXPORT
     // ============================================
 
-    const handleImportData = (data: string) => {
+    const handleImportData = useCallback((data: string) => {
         try {
             const imported = JSON.parse(data);
 
@@ -495,7 +495,7 @@ export function usePlaybook() {
             alert('Failed to import playbook. Please check the data format.');
             return false;
         }
-    };
+    }, []);
 
     const handleImportPlaybook = (file: File) => {
         const reader = new FileReader();
