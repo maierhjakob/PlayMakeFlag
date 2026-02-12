@@ -50,6 +50,7 @@ function App() {
     handleUpdateColumnName,
     handleAssignPlayToCell,
     handleRemovePlayFromCell,
+    handleImportData,
   } = usePlaybook();
 
   // Drawing state
@@ -146,16 +147,28 @@ function App() {
   };
 
   const handleExportPlaybook = () => {
-    const data = JSON.stringify(plays, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `playbook-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    try {
+      // Export the whole playbook object instead of just the plays array
+      // This preserves metadata like the playbook name and grid configuration
+      const data = JSON.stringify(currentPlaybook);
+      // UTF-8 safe base64 encoding
+      const base64 = btoa(encodeURIComponent(data).replace(/%([0-9A-F]{2})/g, (_, p1) => {
+        return String.fromCharCode(parseInt(p1, 16));
+      }));
+
+      const shareUrl = `${window.location.origin}${window.location.pathname}#share=${base64}`;
+
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert("Shareable link copied to clipboard!");
+      }).catch(err => {
+        console.error('Failed to copy link: ', err);
+        // Fallback: still show the prompt or a way to get it
+        prompt("Copy this link to share:", shareUrl);
+      });
+    } catch (e) {
+      console.error("Export failed", e);
+      alert("Failed to generate shareable link.");
+    }
   };
 
   useEffect(() => {
@@ -169,6 +182,37 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isDrawing, activeRoutePoints, setSelectedPlayerId]);
+
+  // Handle shareable links on mount
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#share=')) {
+        const base64 = hash.replace('#share=', '');
+        try {
+          // UTF-8 safe base64 decoding
+          const jsonString = decodeURIComponent(Array.prototype.map.call(atob(base64), (c: string) => {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+
+          if (window.confirm("A playbook has been shared with you. Would you like to import it?")) {
+            const success = handleImportData(jsonString);
+            if (success) {
+              // Clear the hash without reloading
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to decode shared playbook", e);
+          alert("The shared link is invalid or corrupted.");
+        }
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [handleImportData]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!draggedPoint || !currentPlay) return;

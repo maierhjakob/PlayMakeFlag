@@ -431,38 +431,77 @@ export function usePlaybook() {
     // IMPORT/EXPORT
     // ============================================
 
-    const handleImportPlaybook = (file: File) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const imported = JSON.parse(e.target?.result as string);
+    const handleImportData = (data: string) => {
+        try {
+            const imported = JSON.parse(data);
 
-                // Check if it's the new format (array of playbooks) or old format (single playbook)
-                if (Array.isArray(imported)) {
-                    // New format: array of playbooks
+            // 1. Array handling
+            if (Array.isArray(imported)) {
+                if (imported.length === 0) return true;
+
+                // Check if it's an array of Playbooks or an array of Plays
+                const isPlaybookArray = 'plays' in imported[0];
+
+                if (isPlaybookArray) {
+                    // New format: array of multiple playbooks
                     const importedPlaybooks: Playbook[] = imported.map(pb => ({
                         ...pb,
-                        id: crypto.randomUUID(), // Generate new IDs to avoid conflicts
+                        id: crypto.randomUUID(),
                         createdAt: Date.now(),
                         updatedAt: Date.now()
                     }));
                     setPlaybooks(prev => [...prev, ...importedPlaybooks]);
-                } else if (imported.plays) {
-                    // Old single playbook format
+                } else {
+                    // Old format: array of plays export
                     const newPlaybook: Playbook = {
                         id: crypto.randomUUID(),
-                        name: imported.name || 'Imported Playbook',
-                        plays: imported.plays || [],
-                        gridConfig: imported.gridConfig || { columnNames: ['A', 'B', 'C', 'D', 'E'] },
+                        name: 'Imported Plays',
+                        plays: imported.map((p: any) => ({ ...p, id: crypto.randomUUID() })),
+                        gridConfig: { columnNames: ['A', 'B', 'C', 'D', 'E'] },
                         createdAt: Date.now(),
                         updatedAt: Date.now()
                     };
                     setPlaybooks(prev => [...prev, newPlaybook]);
                 }
-            } catch (error) {
-                console.error('Failed to import playbook:', error);
-                alert('Failed to import playbook. Please check the file format.');
             }
+            // 2. Single object handling
+            else if (typeof imported === 'object' && imported !== null) {
+                if ('plays' in imported) {
+                    // Single Playbook object
+                    const newPlaybook: Playbook = {
+                        ...imported,
+                        id: crypto.randomUUID(),
+                        name: imported.name || 'Imported Playbook',
+                        createdAt: Date.now(),
+                        updatedAt: Date.now()
+                    };
+                    setPlaybooks(prev => [...prev, newPlaybook]);
+                } else if ('players' in imported) {
+                    // Single Play object
+                    const newPlaybook: Playbook = {
+                        id: crypto.randomUUID(),
+                        name: imported.name || 'Imported Play',
+                        plays: [{ ...imported, id: crypto.randomUUID() }],
+                        gridConfig: { columnNames: ['A', 'B', 'C', 'D', 'E'] },
+                        createdAt: Date.now(),
+                        updatedAt: Date.now()
+                    };
+                    setPlaybooks(prev => [...prev, newPlaybook]);
+                }
+            }
+            return true;
+        } catch (error) {
+            console.error('Failed to import playbook:', error);
+            alert('Failed to import playbook. Please check the data format.');
+            return false;
+        }
+    };
+
+    const handleImportPlaybook = (file: File) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = e.target?.result as string;
+            handleImportData(data);
         };
         reader.readAsText(file);
     };
@@ -559,6 +598,7 @@ export function usePlaybook() {
 
         // Import/Export
         handleImportPlaybook,
+        handleImportData,
 
         // Helpers
         updateCurrentPlay,
