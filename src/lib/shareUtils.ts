@@ -143,9 +143,9 @@ export const isMinified = (data: any): boolean => {
     return Array.isArray(data) && data[0] === 3;
 };
 
-// HTML Redirector Generator
+// HTML Redirector Generator (Handshake Version)
 export const generateRedirectHtml = (playbookName: string, shareData: string): string => {
-    const appUrl = `https://maierhjakob.github.io/PlayMakeFlag/?share=${encodeURIComponent(shareData)}`;
+    const appUrl = `https://maierhjakob.github.io/PlayMakeFlag/`;
 
     return `<!DOCTYPE html>
 <html>
@@ -154,24 +154,63 @@ export const generateRedirectHtml = (playbookName: string, shareData: string): s
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: white; text-align: center; }
-        .loader { border: 4px solid #1e293b; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: white; text-align: center; padding: 20px; box-sizing: border-box; }
+        .card { background: #1e293b; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; max-width: 400px; width: 100%; }
+        .loader { border: 4px solid #334155; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        a { color: #3b82f6; text-decoration: none; margin-top: 10px; }
+        h2 { margin: 0 0 10px; color: #3b82f6; }
+        p { color: #94a3b8; font-size: 0.9rem; line-height: 1.5; }
+        .btn { display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 20px; cursor: pointer; border: none; transition: background 0.2s; font-size: 1rem; }
+        .btn:hover { background: #2563eb; }
+        .status { margin-top: 15px; font-size: 0.8rem; color: #64748b; font-style: italic; }
     </style>
-    <script>
-        window.onload = function() {
-            setTimeout(function() {
-                window.location.href = "${appUrl}";
-            }, 500);
-        };
-    </script>
 </head>
 <body>
-    <div class="loader"></div>
-    <h2>Opening Playbook...</h2>
-    <p>"${playbookName}"</p>
-    <p>If you aren't redirected, <a href="${appUrl}">click here</a>.</p>
+    <div class="card">
+        <div id="loader" class="loader"></div>
+        <h2>"${playbookName}"</h2>
+        <p>This file contains your playbook data. Click the button below to open it in the Play Designer.</p>
+        
+        <button id="openBtn" class="btn" onclick="openAndShare()">Open Playbook</button>
+        
+        <div id="statusMsg" class="status">Click to load the app...</div>
+    </div>
+
+    <script>
+        const PLAYBOOK_DATA = "${shareData}";
+        let appWindow = null;
+
+        function openAndShare() {
+            const btn = document.getElementById('openBtn');
+            const status = document.getElementById('statusMsg');
+            const loader = document.getElementById('loader');
+
+            status.textContent = "Opening Play Designer...";
+            btn.style.display = "none";
+            loader.style.display = "block";
+
+            // Open the app
+            appWindow = window.open("${appUrl}", "_blank");
+
+            // Handshake logic
+            window.addEventListener("message", (event) => {
+                // Security check: Only allow messages from your domain
+                if (!event.origin.includes("github.io") && !event.origin.includes("localhost")) return;
+
+                if (event.data === "HANDSHAKE_READY") {
+                    status.textContent = "Data transfer in progress...";
+                    // Send the data
+                    appWindow.postMessage({
+                        type: "IMPORT_PLAYBOOK",
+                        data: PLAYBOOK_DATA
+                    }, "*");
+                    
+                    status.textContent = "Success! You can close this tab now.";
+                    loader.style.display = "none";
+                }
+            });
+        }
+    </script>
 </body>
 </html>`;
 };

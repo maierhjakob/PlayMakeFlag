@@ -216,8 +216,41 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isDrawing, activeRoutePoints, setSelectedPlayerId]);
 
-  // Handle shareable links on mount
+  // Handle shareable links and handshakes on mount
   useEffect(() => {
+    // 1. Handshake logic: Tell the opener we are ready
+    if (window.opener) {
+      window.opener.postMessage("HANDSHAKE_READY", "*");
+    }
+
+    const processData = async (shareData: string) => {
+      try {
+        console.log("Processing share data...");
+        // Decode URL-safe or standard
+        const decoded = decodeURIComponent(shareData);
+        const binary = (decoded.includes('-') || decoded.includes('_')) ? fromBase64URL(decoded) : atob(decoded);
+        const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+        const decompressedResponse = new Response(stream);
+        const jsonString = await decompressedResponse.text();
+        const parsedData = JSON.parse(jsonString);
+
+        const playbookToImport = isMinified(parsedData) ? unminifyPlaybook(parsedData) : parsedData;
+
+        if (window.confirm("A playbook has been shared with you. Would you like to import it?")) {
+          const success = handleImportData(JSON.stringify(playbookToImport));
+          if (success) {
+            window.history.replaceState(null, '', window.location.pathname);
+            lastHandledHashRef.current = null;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to decode shared playbook", e);
+        alert("The shared data is invalid or corrupted.");
+      }
+    };
+
     const handleInboundShare = async () => {
       const hash = window.location.hash;
       const searchParams = new URLSearchParams(window.location.search);
@@ -228,40 +261,26 @@ function App() {
         const currentId = shareData.substring(0, 30);
         if (lastHandledHashRef.current === currentId) return;
         lastHandledHashRef.current = currentId;
+        await processData(shareData);
+      }
+    };
 
-        try {
-          // Decode URL-safe or standard
-          const decoded = decodeURIComponent(shareData);
-          const binary = (decoded.includes('-') || decoded.includes('_')) ? fromBase64URL(decoded) : atob(decoded);
-          const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
-
-          const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
-          const decompressedResponse = new Response(stream);
-          const jsonString = await decompressedResponse.text();
-          const parsedData = JSON.parse(jsonString);
-
-          const playbookToImport = isMinified(parsedData) ? unminifyPlaybook(parsedData) : parsedData;
-
-          if (window.confirm("A playbook has been shared with you. Would you like to import it?")) {
-            const success = handleImportData(JSON.stringify(playbookToImport));
-            if (success) {
-              window.history.replaceState(null, '', window.location.pathname);
-              lastHandledHashRef.current = null;
-            }
-          }
-        } catch (e) {
-          console.error("Failed to decode shared playbook", e);
-          alert("The shared link is invalid or corrupted.");
-        }
+    const handleMessage = async (event: MessageEvent) => {
+      // Security: Only handle messages from trusted sources or local files
+      if (event.data?.type === "IMPORT_PLAYBOOK" && event.data?.data) {
+        await processData(event.data.data);
       }
     };
 
     handleInboundShare();
     window.addEventListener('hashchange', handleInboundShare);
     window.addEventListener('popstate', handleInboundShare);
+    window.addEventListener('message', handleMessage);
+
     return () => {
       window.removeEventListener('hashchange', handleInboundShare);
       window.removeEventListener('popstate', handleInboundShare);
+      window.removeEventListener('message', handleMessage);
     };
   }, [handleImportData]);
 
@@ -318,6 +337,7 @@ function App() {
           onSetFormation={handleFormation}
           onApplyRoute={(preset) => handleApplyRoute(preset, activeRouteType)}
           onSetPosition={handleSetPosition}
+          onSetMotionMode={() => setIsSettingMotion(!isSettingMotion)}
           onExportPlaybook={handleExportPlaybook}
           onImportPlaybook={handleImportPlaybook}
           onCopyPlay={handleCopyPlay}
@@ -327,7 +347,6 @@ function App() {
           onFinishDrawing={finishDrawing}
           // Motion props
           isSettingMotion={isSettingMotion}
-          onSetMotionMode={() => setIsSettingMotion(!isSettingMotion)}
           onClearMotion={handleClearMotion}
         />
 
