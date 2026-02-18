@@ -9,6 +9,14 @@ import { PrintView } from '@/components/PrintView'
 import type { Point, RouteType, RouteSegment } from '@/types'
 import { usePlaybook } from '@/hooks/usePlaybook'
 import { S, clampPoint } from '@/lib/constants'
+import {
+  minifyPlaybook,
+  unminifyPlaybook,
+  isMinified,
+  generateRedirectHtml,
+  toBase64URL,
+  fromBase64URL
+} from '@/lib/shareUtils'
 
 function App() {
   const {
@@ -149,28 +157,50 @@ function App() {
 
   const handleExportPlaybook = async () => {
     try {
-      const data = JSON.stringify(currentPlaybook);
+      if (!currentPlaybook) return;
 
-      // Use native CompressionStream to shorten the URL
+      // 1. Minify and Compress
+      const minified = minifyPlaybook(currentPlaybook);
+      const data = JSON.stringify(minified);
       const stream = new Blob([data]).stream().pipeThrough(new CompressionStream('deflate'));
       const compressedResponse = new Response(stream);
       const compressedBuffer = await compressedResponse.arrayBuffer();
 
-      // Convert buffer to base64
+      // 2. Base64 Encoding
       const binary = String.fromCharCode(...new Uint8Array(compressedBuffer));
-      const base64 = btoa(binary);
+      const base64url = toBase64URL(binary);
 
-      const shareUrl = `${window.location.origin}${window.location.pathname}#share=${base64}`;
-
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        alert("Compressed share link copied to clipboard!");
-      }).catch(err => {
-        console.error('Failed to copy link: ', err);
-        prompt("Copy this link to share:", shareUrl);
+      // 3. Generate Redirect HTML
+      const htmlContent = generateRedirectHtml(currentPlaybook.name, base64url);
+      const file = new File([htmlContent], `${currentPlaybook.name.replace(/\s+/g, '_')}_Share.html`, {
+        type: 'text/html'
       });
+
+      // 4. Share File
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `Playbook: ${currentPlaybook.name}`,
+            text: `Open the attached file to view the playbook: ${currentPlaybook.name}`
+          });
+          return;
+        } catch (e) {
+          // Fallback to download if share is cancelled or fails
+        }
+      }
+
+      // 5. Fallback: Direct Download
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert("File downloaded! Share this file with your coach/players.");
     } catch (e) {
       console.error("Export failed", e);
-      alert("Failed to generate shareable link.");
+      alert("Failed to generate sharing file.");
     }
   };
 
@@ -188,46 +218,51 @@ function App() {
 
   // Handle shareable links on mount
   useEffect(() => {
-    const handleHashChange = async () => {
+    const handleInboundShare = async () => {
       const hash = window.location.hash;
-      if (hash.startsWith('#share=')) {
-        // Prevent double prompts (especially in development / strict mode or due to dependency changes)
-        if (lastHandledHashRef.current === hash) return;
-        lastHandledHashRef.current = hash;
+      const searchParams = new URLSearchParams(window.location.search);
+      let shareData = searchParams.get('share') || (hash.startsWith('#share=') ? hash.replace('#share=', '') : null);
 
-        const base64 = hash.replace('#share=', '');
+      if (shareData) {
+        // Prevent double prompts
+        const currentId = shareData.substring(0, 30);
+        if (lastHandledHashRef.current === currentId) return;
+        lastHandledHashRef.current = currentId;
+
         try {
-          // Decode base64 to bytes
-          const binary = atob(base64);
+          // Decode URL-safe or standard
+          const decoded = decodeURIComponent(shareData);
+          const binary = (decoded.includes('-') || decoded.includes('_')) ? fromBase64URL(decoded) : atob(decoded);
           const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
 
-          // Decompress using native DecompressionStream
           const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
           const decompressedResponse = new Response(stream);
           const jsonString = await decompressedResponse.text();
+          const parsedData = JSON.parse(jsonString);
+
+          const playbookToImport = isMinified(parsedData) ? unminifyPlaybook(parsedData) : parsedData;
 
           if (window.confirm("A playbook has been shared with you. Would you like to import it?")) {
-            const success = handleImportData(jsonString);
+            const success = handleImportData(JSON.stringify(playbookToImport));
             if (success) {
-              // Clear the hash without reloading and reset the ref
-              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              window.history.replaceState(null, '', window.location.pathname);
               lastHandledHashRef.current = null;
             }
-          } else {
-            // If they cancel, still don't prompt again for THIS hash until it changes
-            // Note: Clear logic might be needed if they want to import LATER, 
-            // but usually a click is needed to re-trigger.
           }
         } catch (e) {
           console.error("Failed to decode shared playbook", e);
-          alert("The shared link is invalid, corrupted, or used an older version.");
+          alert("The shared link is invalid or corrupted.");
         }
       }
     };
 
-    handleHashChange();
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    handleInboundShare();
+    window.addEventListener('hashchange', handleInboundShare);
+    window.addEventListener('popstate', handleInboundShare);
+    return () => {
+      window.removeEventListener('hashchange', handleInboundShare);
+      window.removeEventListener('popstate', handleInboundShare);
+    };
   }, [handleImportData]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
