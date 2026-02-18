@@ -50,7 +50,6 @@ function App() {
     clearRoutes,
     handleMotionSet,
     handleClearMotion,
-    handleImportPlaybook,
     updateCurrentPlay,
     calculateRouteStart,
     // Grid
@@ -218,14 +217,23 @@ function App() {
 
   // Handle shareable links and handshakes on mount
   useEffect(() => {
-    // 1. Handshake logic: Tell the opener we are ready
+    // 1. Handshake logic: Tell the opener we are ready (and keep telling them until we get data)
+    let handshakeInterval: any;
     if (window.opener) {
-      window.opener.postMessage("HANDSHAKE_READY", "*");
+      console.log("Handshake: Signaling opener...");
+      handshakeInterval = setInterval(() => {
+        window.opener.postMessage("HANDSHAKE_READY", "*");
+      }, 500);
+
+      // Timeout after 10 seconds to stop pinging
+      setTimeout(() => clearInterval(handshakeInterval), 10000);
     }
 
     const processData = async (shareData: string) => {
       try {
         console.log("Processing share data...");
+        // Clear interval if we got data
+        if (handshakeInterval) clearInterval(handshakeInterval);
         // Decode URL-safe or standard
         const decoded = decodeURIComponent(shareData);
         const binary = (decoded.includes('-') || decoded.includes('_')) ? fromBase64URL(decoded) : atob(decoded);
@@ -278,6 +286,7 @@ function App() {
     window.addEventListener('message', handleMessage);
 
     return () => {
+      if (handshakeInterval) clearInterval(handshakeInterval);
       window.removeEventListener('hashchange', handleInboundShare);
       window.removeEventListener('popstate', handleInboundShare);
       window.removeEventListener('message', handleMessage);
@@ -327,7 +336,6 @@ function App() {
             cancelDrawing();
           }}
           onNewPlay={handleNewPlay}
-          onSavePlay={() => localStorage.setItem('savedPlays', JSON.stringify(plays))}
           onDeletePlay={handleDeletePlay}
           onUpdatePlayName={handleUpdatePlayName}
           onUpdatePlayTags={handleUpdatePlayTags}
@@ -339,7 +347,6 @@ function App() {
           onSetPosition={handleSetPosition}
           onSetMotionMode={() => setIsSettingMotion(!isSettingMotion)}
           onExportPlaybook={handleExportPlaybook}
-          onImportPlaybook={handleImportPlaybook}
           onCopyPlay={handleCopyPlay}
           activeRouteType={activeRouteType}
           onSetActiveRouteType={setActiveRouteType}

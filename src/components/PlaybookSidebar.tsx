@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2, Save, FolderOpen, MousePointer2, Copy, MoveRight } from 'lucide-react';
+import { Plus, Trash2, FolderOpen, MousePointer2, Copy, MoveRight } from 'lucide-react';
 import { ROUTE_PRESETS } from '@/lib/routes';
 import { getPos, S } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -11,7 +11,6 @@ interface PlaybookSidebarProps {
     selectedPlayer: Player | null;
     onSelectPlay: (id: string) => void;
     onNewPlay: () => void;
-    onSavePlay: () => void;
     onDeletePlay: (id: string) => void;
     onUpdatePlayName: (id: string, name: string) => void;
     onUpdatePlayTags: (id: string, tags: PlayTag[]) => void;
@@ -22,7 +21,6 @@ interface PlaybookSidebarProps {
     onSetPosition: (role: string) => void;
     onApplyRoute: (preset: any) => void;
     onExportPlaybook: () => void;
-    onImportPlaybook: (file: File) => void;
     onCopyPlay: (id: string) => void;
     activeRouteType: 'primary' | 'option' | 'check' | 'endzone';
     onSetActiveRouteType: (type: 'primary' | 'option' | 'check' | 'endzone') => void;
@@ -41,7 +39,6 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     selectedPlayer,
     onSelectPlay,
     onNewPlay,
-    onSavePlay,
     onDeletePlay,
     onUpdatePlayName,
     onUpdatePlayTags,
@@ -52,7 +49,6 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     onSetPosition,
     onApplyRoute,
     onExportPlaybook,
-    onImportPlaybook,
     onCopyPlay,
     activeRouteType,
     onSetActiveRouteType,
@@ -479,33 +475,15 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                 >
                     <Plus size={18} /> New Play
                 </button>
-                <button
-                    onClick={onSavePlay}
-                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 px-4 rounded-md flex items-center justify-center gap-2 text-sm font-medium border border-slate-700 transition-all"
-                >
-                    <Save size={18} /> Save Changes
-                </button>
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/50">
+                <div className="pt-2 border-t border-slate-700/50">
                     <button
                         onClick={onExportPlaybook}
-                        className="bg-slate-800/50 hover:bg-slate-800 text-slate-400 py-2 px-2 rounded-md flex items-center justify-center gap-1.5 text-xs font-medium border border-slate-700/50 transition-all"
-                        title="Export Playbook to JSON"
+                        className="w-full bg-slate-800/50 hover:bg-slate-800 text-slate-400 py-2 px-4 rounded-md flex items-center justify-center gap-2 text-xs font-medium border border-slate-700/50 transition-all"
+                        title="Export and Share Playbook"
                     >
-                        Export
+                        Export & Share
                     </button>
-                    <label className="cursor-pointer bg-slate-800/50 hover:bg-slate-800 text-slate-400 py-2 px-2 rounded-md flex items-center justify-center gap-1.5 text-xs font-medium border border-slate-700/50 transition-all">
-                        Import
-                        <input
-                            type="file"
-                            accept=".json"
-                            className="hidden"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) onImportPlaybook(file);
-                            }}
-                        />
-                    </label>
                 </div>
             </div>
         </div >
