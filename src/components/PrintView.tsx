@@ -8,7 +8,7 @@ interface PrintViewProps {
 
 export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) => {
     const ROWS = 4;
-    const COLS = 5;
+    const COLS = playbook.gridConfig.columnNames.length;
 
     const getPlayAtCell = (row: number, col: number) => {
         return playbook.plays.find(p => p.gridPosition?.row === row && p.gridPosition?.column === col) || null;

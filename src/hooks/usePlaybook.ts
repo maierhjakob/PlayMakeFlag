@@ -520,6 +520,48 @@ export function usePlaybook() {
         }));
     };
 
+    const handleAddColumn = () => {
+        updateCurrentPlaybook(pb => {
+            const nextCharCode = 65 + pb.gridConfig.columnNames.length; // 65 is 'A'
+            const nextColName = String.fromCharCode(nextCharCode);
+            return {
+                ...pb,
+                gridConfig: {
+                    ...pb.gridConfig,
+                    columnNames: [...pb.gridConfig.columnNames, nextColName]
+                }
+            };
+        });
+    };
+
+    const handleRemoveColumn = (index: number) => {
+        updateCurrentPlaybook(pb => ({
+            ...pb,
+            gridConfig: {
+                ...pb.gridConfig,
+                columnNames: pb.gridConfig.columnNames.filter((_, i) => i !== index)
+            },
+            plays: pb.plays.map(p => {
+                if (p.gridPosition) {
+                    if (p.gridPosition.column === index) {
+                        const { gridPosition, ...rest } = p;
+                        return rest as Play;
+                    }
+                    if (p.gridPosition.column > index) {
+                        return {
+                            ...p,
+                            gridPosition: {
+                                ...p.gridPosition,
+                                column: p.gridPosition.column - 1
+                            }
+                        };
+                    }
+                }
+                return p;
+            })
+        }));
+    };
+
     const handleAssignPlayToCell = (playId: string, row: number, col: number) => {
         updateCurrentPlaybook(pb => ({
             ...pb,
@@ -606,6 +648,8 @@ export function usePlaybook() {
         // Grid
         columnNames,
         handleUpdateColumnName,
+        handleAddColumn,
+        handleRemoveColumn,
         handleAssignPlayToCell,
         handleRemovePlayFromCell,
     };

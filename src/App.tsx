@@ -55,6 +55,8 @@ function App() {
     // Grid
     columnNames,
     handleUpdateColumnName,
+    handleAddColumn,
+    handleRemoveColumn,
     handleAssignPlayToCell,
     handleRemovePlayFromCell,
     handleImportData,
@@ -501,6 +503,8 @@ function App() {
           onUpdateColumnName={handleUpdateColumnName}
           onAssignPlayToCell={handleAssignPlayToCell}
           onRemovePlayFromCell={handleRemovePlayFromCell}
+          onAddColumn={handleAddColumn}
+          onRemoveColumn={handleRemoveColumn}
           onSelectPlay={(id) => {
             setCurrentPlayId(id);
             setSelectedPlayerId(null);

@@ -22,6 +22,8 @@ interface PlaybookGridProps {
     onAssignPlayToCell: (playId: string, row: number, col: number) => void;
     onRemovePlayFromCell: (row: number, col: number) => void;
     onSelectPlay: (id: string) => void;
+    onAddColumn: () => void;
+    onRemoveColumn: (index: number) => void;
     className?: string;
 }
 
@@ -39,6 +41,8 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     onAssignPlayToCell,
     onRemovePlayFromCell,
     onSelectPlay,
+    onAddColumn,
+    onRemoveColumn,
     onOpenPrintSettings,
     className
 }) => {
@@ -48,7 +52,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     const [playbookNameEdit, setPlaybookNameEdit] = useState('');
 
     const ROWS = 4;
-    const COLS = 5;
+    const COLS = columnNames.length;
 
     const currentPlaybook = playbooks.find(pb => pb.id === currentPlaybookId);
 
@@ -192,7 +196,10 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
             <div className="flex-1 overflow-auto p-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
                 <div className="inline-block min-w-full">
                     {/* Column Headers */}
-                    <div className="grid grid-cols-[40px_repeat(5,1fr)] gap-1 mb-1">
+                    <div
+                        className="grid gap-1 mb-1"
+                        style={{ gridTemplateColumns: `40px repeat(${COLS}, 1fr) 40px` }}
+                    >
                         <div className="h-10"></div>
                         {columnNames.map((name, colIndex) => (
                             <div
@@ -219,22 +226,48 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                                 ) : (
                                     <>
                                         <span className="text-emerald-400">{name}</span>
-                                        <button
-                                            onClick={() => startEditingColumn(colIndex)}
-                                            className="absolute right-1 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-slate-700 rounded"
-                                            title="Edit column name"
-                                        >
-                                            <Edit2 size={10} className="text-slate-400" />
-                                        </button>
+                                        <div className="absolute right-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => startEditingColumn(colIndex)}
+                                                className="p-0.5 hover:bg-slate-700 rounded"
+                                                title="Edit column name"
+                                            >
+                                                <Edit2 size={10} className="text-slate-400" />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (window.confirm(`Delete column "${name}" and clear its plays?`)) {
+                                                        onRemoveColumn(colIndex);
+                                                    }
+                                                }}
+                                                className="p-0.5 hover:bg-slate-700 rounded text-red-500/50 hover:text-red-400"
+                                                title="Remove column"
+                                                disabled={columnNames.length <= 1}
+                                            >
+                                                <Trash2 size={10} />
+                                            </button>
+                                        </div>
                                     </>
                                 )}
                             </div>
                         ))}
+                        {/* Add Column Button */}
+                        <button
+                            onClick={onAddColumn}
+                            className="h-10 bg-slate-800/50 hover:bg-slate-800 rounded flex items-center justify-center border border-dashed border-slate-700 hover:border-emerald-500 text-slate-500 hover:text-emerald-400 transition-all"
+                            title="Add column"
+                        >
+                            <Plus size={16} />
+                        </button>
                     </div>
 
                     {/* Grid Rows */}
                     {Array.from({ length: ROWS }).map((_, rowIndex) => (
-                        <div key={rowIndex} className="grid grid-cols-[40px_repeat(5,1fr)] gap-1 mb-1">
+                        <div
+                            key={rowIndex}
+                            className="grid gap-1 mb-1"
+                            style={{ gridTemplateColumns: `40px repeat(${COLS}, 1fr) 40px` }}
+                        >
                             {/* Row Number */}
                             <div className="h-20 bg-slate-800 rounded flex items-center justify-center font-bold text-sm border border-slate-700">
                                 <span className="text-emerald-400">{rowIndex + 1}</span>
@@ -305,6 +338,8 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                                     </button>
                                 );
                             })}
+                            {/* Empty spacer for the delete/add column align */}
+                            <div className="h-20"></div>
                         </div>
                     ))}
                 </div>
