@@ -18,8 +18,8 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
 }) => {
     // Field dimensions (25 yards wide @ 25px/yard)
     const VIRTUAL_WIDTH = 625;
-    const VIRTUAL_HEIGHT = 575; // Cropped field depth: 25y - 2y = 23y
-    const Y_START = 50; // Start 2 yards (50px) from the top
+    const VIRTUAL_HEIGHT = 480; // Cropped field depth: 20y (unchanged — keeps scale the same)
+    const Y_START = 95; // Start 2.5 yards (63px) from the top — shifts content down vs. 125
 
     // Scale factors
     const SCALE_X = width / VIRTUAL_WIDTH;
