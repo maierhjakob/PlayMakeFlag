@@ -297,30 +297,25 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                                     >
                                         {play ? (
                                             <>
-                                                {play.tags && play.tags.length > 0 && (
-                                                    <div className="flex gap-0.5 justify-center flex-wrap mb-0.5">
-                                                        {play.tags.map(tag => (
-                                                            <div
-                                                                key={tag.id}
-                                                                className="w-2.5 h-2.5 rounded-[1px] flex items-center justify-center text-[6px] font-black text-white shadow-sm"
-                                                                style={{ backgroundColor: tag.color }}
-                                                            >
-                                                                {tag.text.slice(0, 1)}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                                {/* Name + tags row above preview */}
+                                                <div className="flex items-center gap-0.5 w-full px-1 overflow-hidden mb-0.5">
+                                                    <span className="text-[9px] truncate flex-1 leading-tight">{play.name}</span>
+                                                    {play.tags?.map(tag => (
+                                                        <div
+                                                            key={tag.id}
+                                                            className="w-2.5 h-2.5 rounded-[1px] shrink-0 flex items-center justify-center text-[6px] font-black text-white shadow-sm"
+                                                            style={{ backgroundColor: tag.color }}
+                                                        >
+                                                            {tag.text.slice(0, 1)}
+                                                        </div>
+                                                    ))}
+                                                </div>
                                                 <MiniPlayPreview
                                                     play={play}
                                                     width={73}
                                                     height={60}
                                                     className="rounded"
                                                 />
-                                                <div className="flex items-center w-full px-1 overflow-hidden mt-0.5">
-                                                    <span className="text-[9px] truncate flex-1 leading-tight text-center">
-                                                        {play.name}
-                                                    </span>
-                                                </div>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
