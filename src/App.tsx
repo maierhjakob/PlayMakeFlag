@@ -362,130 +362,131 @@ function App() {
         {/* Center - Field */}
         <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto">
           <div className="p-8 flex items-start gap-4">
-            <div className="relative">
-              <Field
-                onClick={handleFieldClick}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                className={isDrawing ? 'cursor-crosshair' : isSettingMotion ? 'cursor-alias' : 'cursor-default'}
-                showRaster={isDrawing || isSettingMotion || !!draggedPoint}
-              >
-                {/* Render Routes */}
-                <svg className="absolute inset-0 pointer-events-none z-0" width="100%" height="100%">
-                  {/* ... (Motion and Routes rendering) */}
-                  {currentPlay?.players.map(player => {
-                    if (!player.motion) return null;
-                    const start = player.position;
-                    const end = player.motion;
-                    const points = [
-                      `${start.x},${start.y}`,
-                      `${start.x},${end.y}`,
-                      `${end.x},${end.y}`
-                    ].join(' ');
-
-                    return (
-                      <polyline
-                        key={`motion-${player.id}`}
-                        points={points}
-                        stroke={player.color}
-                        strokeWidth={4}
-                        strokeOpacity={0.5}
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    );
-                  })}
-
-                  {currentPlay?.players.map(player => (
-                    player.routes.filter(r => r.type !== 'primary').map(route => (
-                      <RoutePath
-                        key={route.id}
-                        segment={route}
-                        color={player.color}
-                        isSelected={selectedPlayerId === player.id}
-                      />
-                    ))
+            <div className="flex flex-col items-center gap-2">
+              {/* Tags above the field */}
+              {currentPlay?.tags && currentPlay.tags.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap justify-center w-full">
+                  {currentPlay.tags.map(tag => (
+                    <div
+                      key={tag.id}
+                      className="px-3 py-1 rounded-full text-sm font-black text-white shadow-lg"
+                      style={{ backgroundColor: tag.color }}
+                    >
+                      {tag.text}
+                    </div>
                   ))}
-                  {currentPlay?.players.map(player => (
-                    player.routes.filter(r => r.type === 'primary').map(route => (
-                      <RoutePath
-                        key={route.id}
-                        segment={route}
-                        color={player.color}
-                        isSelected={selectedPlayerId === player.id}
-                      />
-                    ))
-                  ))}
-                  {isDrawing && activeRoutePoints.length > 0 && (
-                    <RoutePath
-                      segment={{ id: 'drawing', type: drawingType, points: activeRoutePoints }}
-                      color={selectedPlayer?.color || '#000'}
-                      isSelected={true}
-                    />
-                  )}
-                </svg>
+                </div>
+              )}
+              <div className="relative">
+                <Field
+                  onClick={handleFieldClick}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
+                  className={isDrawing ? 'cursor-crosshair' : isSettingMotion ? 'cursor-alias' : 'cursor-default'}
+                  showRaster={isDrawing || isSettingMotion || !!draggedPoint}
+                >
+                  {/* Render Routes */}
+                  <svg className="absolute inset-0 pointer-events-none z-0" width="100%" height="100%">
+                    {/* ... (Motion and Routes rendering) */}
+                    {currentPlay?.players.map(player => {
+                      if (!player.motion) return null;
+                      const start = player.position;
+                      const end = player.motion;
+                      const points = [
+                        `${start.x},${start.y}`,
+                        `${start.x},${end.y}`,
+                        `${end.x},${end.y}`
+                      ].join(' ');
 
-                {selectedPlayer && !isDrawing && (
-                  <svg className="absolute inset-0 pointer-events-none z-20" width="100%" height="100%">
-                    {selectedPlayer.routes.map(route => (
-                      route.points.map((point, idx) => (
-                        <circle
-                          key={`${route.id}-${idx}`}
-                          cx={point.x}
-                          cy={point.y}
-                          r={6}
-                          fill="white"
-                          stroke={selectedPlayer.color}
-                          strokeWidth={2}
-                          className="pointer-events-auto cursor-move hover:r-8 transition-all"
-                          onMouseDown={(e) => {
-                            e.stopPropagation();
-                            setDraggedPoint({
-                              playerId: selectedPlayer.id,
-                              routeId: route.id,
-                              pointIndex: idx
-                            });
-                          }}
+                      return (
+                        <polyline
+                          key={`motion-${player.id}`}
+                          points={points}
+                          stroke={player.color}
+                          strokeWidth={4}
+                          strokeOpacity={0.5}
+                          fill="none"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      );
+                    })}
+
+                    {currentPlay?.players.map(player => (
+                      player.routes.filter(r => r.type !== 'primary').map(route => (
+                        <RoutePath
+                          key={route.id}
+                          segment={route}
+                          color={player.color}
+                          isSelected={selectedPlayerId === player.id}
                         />
                       ))
                     ))}
+                    {currentPlay?.players.map(player => (
+                      player.routes.filter(r => r.type === 'primary').map(route => (
+                        <RoutePath
+                          key={route.id}
+                          segment={route}
+                          color={player.color}
+                          isSelected={selectedPlayerId === player.id}
+                        />
+                      ))
+                    ))}
+                    {isDrawing && activeRoutePoints.length > 0 && (
+                      <RoutePath
+                        segment={{ id: 'drawing', type: drawingType, points: activeRoutePoints }}
+                        color={selectedPlayer?.color || '#000'}
+                        isSelected={true}
+                      />
+                    )}
                   </svg>
-                )}
 
-                {currentPlay?.players.map(player => (
-                  <PlayerToken
-                    key={player.id}
-                    player={player}
-                    isSelected={selectedPlayerId === player.id}
-                    onSelect={(id) => {
-                      if (isSettingMotion) {
-                        handleMotionSet(id);
-                      } else if (!isDrawing) {
-                        setSelectedPlayerId(id);
-                      }
-                    }}
-                  />
-                ))}
-              </Field>
+                  {selectedPlayer && !isDrawing && (
+                    <svg className="absolute inset-0 pointer-events-none z-20" width="100%" height="100%">
+                      {selectedPlayer.routes.map(route => (
+                        route.points.map((point, idx) => (
+                          <circle
+                            key={`${route.id}-${idx}`}
+                            cx={point.x}
+                            cy={point.y}
+                            r={6}
+                            fill="white"
+                            stroke={selectedPlayer.color}
+                            strokeWidth={2}
+                            className="pointer-events-auto cursor-move hover:r-8 transition-all"
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              setDraggedPoint({
+                                playerId: selectedPlayer.id,
+                                routeId: route.id,
+                                pointIndex: idx
+                              });
+                            }}
+                          />
+                        ))
+                      ))}
+                    </svg>
+                  )}
+
+                  {currentPlay?.players.map(player => (
+                    <PlayerToken
+                      key={player.id}
+                      player={player}
+                      isSelected={selectedPlayerId === player.id}
+                      onSelect={(id) => {
+                        if (isSettingMotion) {
+                          handleMotionSet(id);
+                        } else if (!isDrawing) {
+                          setSelectedPlayerId(id);
+                        }
+                      }}
+                    />
+                  ))}
+                </Field>
+              </div>
             </div>
 
-            {/* Play Tags Panel (Right side of Field) */}
-            {currentPlay?.tags && currentPlay.tags.length > 0 && (
-              <div className="flex flex-col gap-2 pt-1 border-l-2 border-slate-700/50 pl-4 py-2">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">Tags</div>
-                {currentPlay.tags.map(tag => (
-                  <div
-                    key={tag.id}
-                    className="w-10 h-10 rounded shadow-lg flex items-center justify-center text-lg font-black text-white border border-white/20"
-                    style={{ backgroundColor: tag.color }}
-                  >
-                    {tag.text}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 

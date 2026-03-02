@@ -86,7 +86,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     };
 
     return (
-        <div className={cn("flex flex-col h-full bg-slate-900 text-white w-[400px] border-l border-slate-700 font-sans", className)}>
+        <div className={cn("flex flex-col h-full bg-slate-900 text-white w-[490px] border-l border-slate-700 font-sans", className)}>
             {/* Header */}
             <div className="p-4 border-b border-slate-700 bg-slate-950/50 space-y-3">
                 <div className="flex items-center justify-between">
@@ -297,18 +297,9 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                                     >
                                         {play ? (
                                             <>
-                                                <MiniPlayPreview
-                                                    play={play}
-                                                    width={50}
-                                                    height={56}
-                                                    className="rounded"
-                                                />
-                                                <div className="flex items-center gap-1 w-full px-1 overflow-hidden mt-0.5">
-                                                    <span className="text-[9px] truncate flex-1 leading-tight text-center">
-                                                        {play.name}
-                                                    </span>
-                                                    <div className="flex gap-0.5 shrink-0">
-                                                        {play.tags?.map(tag => (
+                                                {play.tags && play.tags.length > 0 && (
+                                                    <div className="flex gap-0.5 justify-center flex-wrap mb-0.5">
+                                                        {play.tags.map(tag => (
                                                             <div
                                                                 key={tag.id}
                                                                 className="w-2.5 h-2.5 rounded-[1px] flex items-center justify-center text-[6px] font-black text-white shadow-sm"
@@ -318,6 +309,17 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                                                             </div>
                                                         ))}
                                                     </div>
+                                                )}
+                                                <MiniPlayPreview
+                                                    play={play}
+                                                    width={73}
+                                                    height={60}
+                                                    className="rounded"
+                                                />
+                                                <div className="flex items-center w-full px-1 overflow-hidden mt-0.5">
+                                                    <span className="text-[9px] truncate flex-1 leading-tight text-center">
+                                                        {play.name}
+                                                    </span>
                                                 </div>
                                                 <button
                                                     onClick={(e) => {
