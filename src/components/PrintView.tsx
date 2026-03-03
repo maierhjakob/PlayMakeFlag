@@ -47,8 +47,8 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                                                 <div className="print-play-box">
                                                     <MiniPlayPreview
                                                         play={play}
-                                                        width={115}
-                                                        height={92}
+                                                        width={120}
+                                                        height={95}
                                                         strokeWidth={2.5}
                                                         className="print-mini-preview"
                                                     />
@@ -100,8 +100,8 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                     }
 
                     .print-card {
-                        width: 11cm;
-                        height: 6cm;
+                        width: 11.5cm;
+                        height: 6.33cm;
                         border: 1px solid black;
                         background: white;
                         display: flex;
@@ -117,7 +117,7 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                     }
 
                     .print-grid-row {
-                        height: 1.4cm;
+                        height: 1.48cm;
                         flex: none;
                         display: flex;
                         border-bottom: 1px solid #333;
