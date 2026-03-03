@@ -49,7 +49,7 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) 
                                                         play={play}
                                                         width={115}
                                                         height={92}
-                                                        strokeWidth={2.0}
+                                                        strokeWidth={2.5}
                                                         className="print-mini-preview"
                                                     />
                                                     <div className="print-play-label-container">
