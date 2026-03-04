@@ -74,7 +74,9 @@ function App() {
     routeId: string;
     pointIndex: number;
   } | null>(null);
+  const [draggedPlayer, setDraggedPlayer] = useState<string | null>(null);
   const wasDraggingRef = useRef(false);
+  const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastHandledHashRef = useRef<string | null>(null);
 
   const snapToGrid = (p: Point): Point => {
@@ -296,7 +298,8 @@ function App() {
   }, [handleImportData]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!draggedPoint || !currentPlay) return;
+    if (!draggedPoint && !draggedPlayer) return;
+    if (!currentPlay) return;
 
     wasDraggingRef.current = true;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -304,24 +307,32 @@ function App() {
     const y = e.clientY - rect.top;
     const snapped = snapToGrid({ x, y });
 
-    const updatedPlayers = currentPlay.players.map(p => {
-      if (p.id !== draggedPoint.playerId) return p;
-      return {
-        ...p,
-        routes: p.routes.map(r => {
-          if (r.id !== draggedPoint.routeId) return r;
-          const newPoints = [...r.points];
-          newPoints[draggedPoint.pointIndex] = clampPoint(snapped);
-          return { ...r, points: newPoints };
-        })
-      };
-    });
-
-    updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
+    if (draggedPoint) {
+      const updatedPlayers = currentPlay.players.map(p => {
+        if (p.id !== draggedPoint.playerId) return p;
+        return {
+          ...p,
+          routes: p.routes.map(r => {
+            if (r.id !== draggedPoint.routeId) return r;
+            const newPoints = [...r.points];
+            newPoints[draggedPoint.pointIndex] = clampPoint(snapped);
+            return { ...r, points: newPoints };
+          })
+        };
+      });
+      updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
+    } else if (draggedPlayer) {
+      handleUpdatePlayer(draggedPlayer, { position: clampPoint(snapped) });
+    }
   };
 
   const handleMouseUp = () => {
     setDraggedPoint(null);
+    setDraggedPlayer(null);
+    if (dragTimerRef.current) {
+      clearTimeout(dragTimerRef.current);
+      dragTimerRef.current = null;
+    }
   };
 
   return (
@@ -384,7 +395,7 @@ function App() {
                   onMouseUp={handleMouseUp}
                   onMouseLeave={handleMouseUp}
                   className={isDrawing ? 'cursor-crosshair' : isSettingMotion ? 'cursor-alias' : 'cursor-default'}
-                  showRaster={isDrawing || isSettingMotion || !!draggedPoint}
+                  showRaster={isDrawing || isSettingMotion || !!draggedPoint || !!draggedPlayer}
                 >
                   {/* Render Routes */}
                   <svg className="absolute inset-0 pointer-events-none z-0" width="100%" height="100%">
@@ -474,11 +485,20 @@ function App() {
                       key={player.id}
                       player={player}
                       isSelected={selectedPlayerId === player.id}
+                      isDragging={draggedPlayer === player.id}
                       onSelect={(id) => {
                         if (isSettingMotion) {
                           handleMotionSet(id);
                         } else if (!isDrawing) {
                           setSelectedPlayerId(id);
+                        }
+                      }}
+                      onDragStart={(id) => {
+                        if (!isDrawing && !isSettingMotion) {
+                          dragTimerRef.current = setTimeout(() => {
+                            setDraggedPlayer(id);
+                            dragTimerRef.current = null;
+                          }, 300);
                         }
                       }}
                     />
