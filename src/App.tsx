@@ -52,6 +52,9 @@ function App() {
     handleClearMotion,
     updateCurrentPlay,
     calculateRouteStart,
+    pushToUndoStack,
+    undo,
+    redo,
     // Grid
     columnNames,
     handleUpdateColumnName,
@@ -122,6 +125,7 @@ function App() {
 
   const finishDrawing = () => {
     if (!isDrawing || !selectedPlayer || !currentPlay) return;
+    pushToUndoStack();
     const newRoute: RouteSegment = {
       id: crypto.randomUUID(),
       type: drawingType,
@@ -214,10 +218,18 @@ function App() {
         if (isDrawing) cancelDrawing();
         else setSelectedPlayerId(null);
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        redo();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDrawing, activeRoutePoints, setSelectedPlayerId]);
+  }, [isDrawing, activeRoutePoints, setSelectedPlayerId, undo, redo]);
 
   // Handle shareable links and handshakes on mount
   useEffect(() => {
@@ -468,6 +480,7 @@ function App() {
                             className="pointer-events-auto cursor-move hover:r-8 transition-all"
                             onMouseDown={(e) => {
                               e.stopPropagation();
+                              pushToUndoStack();
                               setDraggedPoint({
                                 playerId: selectedPlayer.id,
                                 routeId: route.id,
@@ -496,6 +509,7 @@ function App() {
                       onDragStart={(id) => {
                         if (!isDrawing && !isSettingMotion) {
                           dragTimerRef.current = setTimeout(() => {
+                            pushToUndoStack();
                             setDraggedPlayer(id);
                             dragTimerRef.current = null;
                           }, 300);

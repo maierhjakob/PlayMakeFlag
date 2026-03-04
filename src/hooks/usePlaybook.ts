@@ -33,6 +33,10 @@ function migrateOldData(): Playbook[] {
 }
 
 export function usePlaybook() {
+    // Undo/redo history — in-memory only, scoped to current play
+    const [undoStack, setUndoStack] = useState<Play[]>([]);
+    const [redoStack, setRedoStack] = useState<Play[]>([]);
+
     // Initialize playbooks with migration
     const [playbooks, setPlaybooks] = useState<Playbook[]>(() => {
         const saved = localStorage.getItem('playbooks');
@@ -93,6 +97,35 @@ export function usePlaybook() {
             ...pb,
             plays: pb.plays.map(p => p.id === updatedPlay.id ? updatedPlay : p)
         }));
+    };
+
+    // Reset history whenever the active play changes
+    useEffect(() => {
+        setUndoStack([]);
+        setRedoStack([]);
+    }, [currentPlayId]);
+
+    // Snapshot the current play state before a discrete change
+    const pushToUndoStack = () => {
+        if (!currentPlay) return;
+        setUndoStack(prev => [...prev.slice(-49), currentPlay]);
+        setRedoStack([]);
+    };
+
+    const undo = () => {
+        if (undoStack.length === 0 || !currentPlay) return;
+        const prev = undoStack[undoStack.length - 1];
+        setRedoStack(r => [...r, currentPlay]);
+        setUndoStack(u => u.slice(0, -1));
+        updateCurrentPlay(prev);
+    };
+
+    const redo = () => {
+        if (redoStack.length === 0 || !currentPlay) return;
+        const next = redoStack[redoStack.length - 1];
+        setUndoStack(u => [...u, currentPlay]);
+        setRedoStack(r => r.slice(0, -1));
+        updateCurrentPlay(next);
     };
 
     // ============================================
@@ -261,6 +294,7 @@ export function usePlaybook() {
         const positionData = POSITIONS[role as keyof typeof POSITIONS];
         if (!positionData) return;
 
+        pushToUndoStack();
         handleUpdatePlayer(selectedPlayer.id, {
             role,
             position: getPos(positionData.x, positionData.depth),
@@ -270,6 +304,7 @@ export function usePlaybook() {
 
     const handleFormation = (type: 'strong-left' | 'strong-right') => {
         if (!currentPlay) return;
+        pushToUndoStack();
 
         const formations = {
             'strong-left': [
@@ -319,6 +354,7 @@ export function usePlaybook() {
 
     const handleApplyRoute = (preset: RoutePreset, routeType: RouteType) => {
         if (!selectedPlayer || !currentPlay) return;
+        pushToUndoStack();
 
         // Toggle: If this preset is already applied to this specific route type, remove it
         const existingRoute = selectedPlayer.routes.find(r => r.type === routeType);
@@ -359,6 +395,7 @@ export function usePlaybook() {
 
     const clearRoutes = () => {
         if (!selectedPlayer || !currentPlay) return;
+        pushToUndoStack();
 
         updateCurrentPlay({
             ...currentPlay,
@@ -377,6 +414,7 @@ export function usePlaybook() {
             setIsSettingMotion(false);
             return;
         }
+        pushToUndoStack();
 
         const targetPlayer = currentPlay.players.find(p => p.id === targetPlayerId);
         if (!targetPlayer) return;
@@ -406,6 +444,7 @@ export function usePlaybook() {
 
     const handleClearMotion = () => {
         if (!selectedPlayer || !currentPlay || !selectedPlayer.motion) return;
+        pushToUndoStack();
 
         const dx = selectedPlayer.position.x - selectedPlayer.motion.x;
         const dy = selectedPlayer.position.y - selectedPlayer.motion.y;
@@ -641,6 +680,13 @@ export function usePlaybook() {
         // Import/Export
         handleImportPlaybook,
         handleImportData,
+
+        // Undo/Redo
+        pushToUndoStack,
+        undo,
+        redo,
+        canUndo: undoStack.length > 0,
+        canRedo: redoStack.length > 0,
 
         // Helpers
         updateCurrentPlay,
