@@ -3,7 +3,8 @@ import { Plus, Trash2, FolderOpen, MousePointer2, Copy, MoveRight } from 'lucide
 import { ROUTE_PRESETS } from '@/lib/routes';
 import { getPos, S } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { Play, Player, PlayTag } from '@/types';
+import type { Play, Player, PlayTag, PlayFolder } from '@/types';
+import { FolderTree } from '@/components/FolderTree';
 
 interface PlaybookSidebarProps {
     plays: Play[];
@@ -30,6 +31,16 @@ interface PlaybookSidebarProps {
     isSettingMotion: boolean;
     onSetMotionMode: () => void;
     onClearMotion: () => void;
+    // Folder props
+    folders: PlayFolder[];
+    onCreateFolder: (name: string, parentId?: string) => void;
+    onDeleteFolder: (id: string) => void;
+    onRenameFolder: (id: string, name: string) => void;
+    onToggleFolder: (id: string) => void;
+    onAssignPlayToFolder: (playId: string, folderId: string | undefined) => void;
+    onReorderPlayInFolder: (draggedId: string, targetId: string, folderId: string | undefined) => void;
+    onAutoSortByTags: () => void;
+    onAutoSortByFormation: () => void;
     className?: string;
 }
 
@@ -55,6 +66,15 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     isDrawing,
     onFinishDrawing,
     onClearMotion,
+    folders,
+    onCreateFolder,
+    onDeleteFolder,
+    onRenameFolder,
+    onToggleFolder,
+    onAssignPlayToFolder,
+    onReorderPlayInFolder,
+    onAutoSortByTags,
+    onAutoSortByFormation,
     className
 }) => {
     return (
@@ -65,21 +85,25 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                     <FolderOpen size={20} /> Plays
                 </h2>
 
-                {/* Play Selector Dropdown */}
+                {/* Play Folder Tree */}
                 <div className="space-y-2">
-                    <label className="text-[10px] text-slate-500 uppercase font-semibold">Current Play</label>
-                    <select
-                        value={currentPlayId || ''}
-                        onChange={(e) => onSelectPlay(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
-                    >
-                        <option value="" disabled>Select a play...</option>
-                        {[...plays].sort((a, b) => a.name.localeCompare(b.name)).map((play) => (
-                            <option key={play.id} value={play.id}>
-                                {play.name}
-                            </option>
-                        ))}
-                    </select>
+                    <label className="text-[10px] text-slate-500 uppercase font-semibold">Plays</label>
+                    <div className="max-h-64 overflow-y-auto rounded border border-slate-700 bg-slate-900/50 py-1">
+                        <FolderTree
+                            plays={plays}
+                            folders={folders}
+                            currentPlayId={currentPlayId}
+                            onSelectPlay={onSelectPlay}
+                            onToggleFolder={onToggleFolder}
+                            onCreateFolder={onCreateFolder}
+                            onDeleteFolder={onDeleteFolder}
+                            onRenameFolder={onRenameFolder}
+                            onAssignPlayToFolder={onAssignPlayToFolder}
+                            onReorderPlayInFolder={onReorderPlayInFolder}
+                            onAutoSortByTags={onAutoSortByTags}
+                            onAutoSortByFormation={onAutoSortByFormation}
+                        />
+                    </div>
 
                     {/* Play Actions - Delete and Duplicate */}
                     {currentPlayId && (

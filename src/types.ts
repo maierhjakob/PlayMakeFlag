@@ -43,6 +43,15 @@ export interface Play {
     };
     ballPosition?: Point;
     tags?: PlayTag[];
+    folderId?: string;
+}
+
+export interface PlayFolder {
+    id: string;
+    name: string;
+    isExpanded: boolean;
+    order: number;
+    parentId?: string; // if set, this is a sub-folder inside another folder
 }
 
 export interface PlaybookEntry {

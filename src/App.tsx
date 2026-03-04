@@ -63,6 +63,16 @@ function App() {
     handleAssignPlayToCell,
     handleRemovePlayFromCell,
     handleImportData,
+    // Folders
+    folders,
+    handleCreateFolder,
+    handleDeleteFolder,
+    handleRenameFolder,
+    handleToggleFolder,
+    handleAssignPlayToFolder,
+    handleReorderPlayInFolder,
+    handleAutoSortByTags,
+    handleAutoSortByFormation,
   } = usePlaybook();
 
   // Drawing state
@@ -380,6 +390,15 @@ function App() {
           // Motion props
           isSettingMotion={isSettingMotion}
           onClearMotion={handleClearMotion}
+          folders={folders}
+          onCreateFolder={handleCreateFolder}
+          onDeleteFolder={handleDeleteFolder}
+          onRenameFolder={handleRenameFolder}
+          onToggleFolder={handleToggleFolder}
+          onAssignPlayToFolder={handleAssignPlayToFolder}
+          onReorderPlayInFolder={handleReorderPlayInFolder}
+          onAutoSortByTags={handleAutoSortByTags}
+          onAutoSortByFormation={handleAutoSortByFormation}
         />
 
         {/* Center - Field */}
