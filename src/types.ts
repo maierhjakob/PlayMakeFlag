@@ -35,12 +35,22 @@ export interface Play {
     name: string;
     description?: string;
     players: Player[];
+    // gridPosition is NOT stored on Play — it lives in PlaybookEntry.
+    // It may be attached at read-time for component convenience.
     gridPosition?: {
         row: number;    // 0-3 (for rows 1-4)
         column: number; // 0-4 (for columns A-E)
     };
     ballPosition?: Point;
     tags?: PlayTag[];
+}
+
+export interface PlaybookEntry {
+    playId: string;
+    gridPosition?: {
+        row: number;
+        column: number;
+    };
 }
 
 export interface PlaybookGrid {
@@ -50,7 +60,8 @@ export interface PlaybookGrid {
 export interface Playbook {
     id: string;
     name: string;
-    plays: Play[];
+    /** References to global plays, with per-playbook grid positions. */
+    entries: PlaybookEntry[];
     gridConfig: {
         columnNames: string[];
     };

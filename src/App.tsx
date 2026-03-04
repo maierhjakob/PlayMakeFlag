@@ -167,7 +167,7 @@ function App() {
       if (!currentPlaybook) return;
 
       // 1. Minify and Compress
-      const minified = minifyPlaybook(currentPlaybook);
+      const minified = minifyPlaybook(currentPlaybook, plays);
       const data = JSON.stringify(minified);
       const stream = new Blob([data]).stream().pipeThrough(new CompressionStream('deflate'));
       const compressedResponse = new Response(stream);
@@ -559,6 +559,7 @@ function App() {
       {currentPlaybook && (
         <PrintView
           playbook={currentPlaybook}
+          plays={plays}
           playsPerPage={printSettings.playsPerPage}
         />
       )}

@@ -1,69 +1,104 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Playbook, Play, Player, Point, RouteSegment, RouteType, PlayTag } from '@/types';
+import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag } from '@/types';
 import { POSITIONS, getPos, clampPoint } from '@/lib/constants';
 import { generateRoutePoints } from '@/lib/routes';
 import type { RoutePreset } from '@/lib/routes';
 
-// Migration helper: Convert old format to new format
-function migrateOldData(): Playbook[] {
+// ============================================
+// MIGRATION
+// ============================================
+
+/**
+ * Loads global plays from storage, migrating from the old format where plays
+ * were embedded inside each playbook object.
+ */
+function loadGlobalPlays(): Play[] {
+    const saved = localStorage.getItem('global_plays');
+    if (saved) return JSON.parse(saved);
+
+    // Migrate: extract plays from old playbooks format
+    const savedPlaybooks = localStorage.getItem('playbooks');
+    if (savedPlaybooks) {
+        const oldPlaybooks: any[] = JSON.parse(savedPlaybooks);
+        const plays: Play[] = [];
+        const seenIds = new Set<string>();
+        for (const pb of oldPlaybooks) {
+            if (Array.isArray(pb.plays)) {
+                for (const play of pb.plays) {
+                    if (!seenIds.has(play.id)) {
+                        // Strip gridPosition — it belongs in PlaybookEntry now
+                        const { gridPosition: _gp, ...globalPlay } = play;
+                        plays.push(globalPlay);
+                        seenIds.add(play.id);
+                    }
+                }
+            }
+        }
+        return plays;
+    }
+
+    // Also try legacy migration
     const oldPlays = localStorage.getItem('savedPlays');
-    const oldColumns = localStorage.getItem('playbookGridColumns');
-
     if (oldPlays) {
-        const plays: Play[] = JSON.parse(oldPlays);
-        const columnNames = oldColumns ? JSON.parse(oldColumns) : ['A', 'B', 'C', 'D', 'E'];
-
-        const defaultPlaybook: Playbook = {
-            id: crypto.randomUUID(),
-            name: 'defaultPlaybook',
-            plays,
-            gridConfig: { columnNames },
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-        };
-
-        // Clear old data
-        localStorage.removeItem('savedPlays');
-        localStorage.removeItem('playbookGridColumns');
-
-        return [defaultPlaybook];
+        return (JSON.parse(oldPlays) as any[]).map(({ gridPosition: _gp, ...p }) => p);
     }
 
     return [];
 }
+
+/**
+ * Loads playbooks, migrating from old format (plays: Play[]) to new format
+ * (entries: PlaybookEntry[]).
+ */
+function loadPlaybooks(): Playbook[] {
+    const saved = localStorage.getItem('playbooks');
+    if (saved) {
+        const parsed: any[] = JSON.parse(saved);
+        return parsed.map(pb => {
+            // Already migrated
+            if (pb.entries) return pb as Playbook;
+
+            // Old format: pb.plays is Play[] — convert to entries
+            const entries: PlaybookEntry[] = (pb.plays || []).map((p: any) => ({
+                playId: p.id,
+                ...(p.gridPosition ? { gridPosition: p.gridPosition } : {})
+            }));
+
+            const { plays: _plays, ...rest } = pb;
+            return { ...rest, entries } as Playbook;
+        });
+    }
+
+    // Legacy migration: single default playbook
+    const oldColumns = localStorage.getItem('playbookGridColumns');
+    return [{
+        id: crypto.randomUUID(),
+        name: 'defaultPlaybook',
+        entries: [],
+        gridConfig: { columnNames: oldColumns ? JSON.parse(oldColumns) : ['A', 'B', 'C', 'D', 'E'] },
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    }];
+}
+
+// ============================================
+// HOOK
+// ============================================
 
 export function usePlaybook() {
     // Undo/redo history — in-memory only, scoped to current play
     const [undoStack, setUndoStack] = useState<Play[]>([]);
     const [redoStack, setRedoStack] = useState<Play[]>([]);
 
-    // Initialize playbooks with migration
-    const [playbooks, setPlaybooks] = useState<Playbook[]>(() => {
-        const saved = localStorage.getItem('playbooks');
-        if (saved) {
-            return JSON.parse(saved);
-        }
+    // Global plays — shared across all playbooks
+    const [globalPlays, setGlobalPlays] = useState<Play[]>(loadGlobalPlays);
 
-        // Try to migrate old data
-        const migrated = migrateOldData();
-        if (migrated.length > 0) {
-            return migrated;
-        }
-
-        // Create default playbook
-        return [{
-            id: crypto.randomUUID(),
-            name: 'defaultPlaybook',
-            plays: [],
-            gridConfig: { columnNames: ['A', 'B', 'C', 'D', 'E'] },
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-        }];
-    });
+    const [playbooks, setPlaybooks] = useState<Playbook[]>(loadPlaybooks);
 
     const [currentPlaybookId, setCurrentPlaybookId] = useState<string>(() => {
         const saved = localStorage.getItem('currentPlaybookId');
-        return saved || playbooks[0]?.id || '';
+        const books = loadPlaybooks();
+        return saved || books[0]?.id || '';
     });
 
     const [currentPlayId, setCurrentPlayId] = useState<string | null>(null);
@@ -71,12 +106,25 @@ export function usePlaybook() {
     const [isSettingMotion, setIsSettingMotion] = useState(false);
 
     const currentPlaybook = playbooks.find(pb => pb.id === currentPlaybookId) || playbooks[0] || null;
-    const plays = currentPlaybook?.plays || [];
-    const currentPlay = plays.find(p => p.id === currentPlayId) || null;
+
+    // Plays visible in the current playbook, with gridPosition merged in from entries
+    const plays: Play[] = (currentPlaybook?.entries || [])
+        .map(entry => {
+            const play = globalPlays.find(p => p.id === entry.playId);
+            if (!play) return null;
+            return entry.gridPosition ? { ...play, gridPosition: entry.gridPosition } : play;
+        })
+        .filter(Boolean) as Play[];
+
+    const currentPlay = globalPlays.find(p => p.id === currentPlayId) || null;
     const selectedPlayer = currentPlay?.players.find(p => p.id === selectedPlayerId) || null;
     const columnNames = currentPlaybook?.gridConfig.columnNames || ['A', 'B', 'C', 'D', 'E'];
 
-    // Save to localStorage
+    // Persist to localStorage
+    useEffect(() => {
+        localStorage.setItem('global_plays', JSON.stringify(globalPlays));
+    }, [globalPlays]);
+
     useEffect(() => {
         localStorage.setItem('playbooks', JSON.stringify(playbooks));
     }, [playbooks]);
@@ -85,27 +133,31 @@ export function usePlaybook() {
         localStorage.setItem('currentPlaybookId', currentPlaybookId);
     }, [currentPlaybookId]);
 
-    // Update current playbook
+    // ============================================
+    // CORE UPDATERS
+    // ============================================
+
     const updateCurrentPlaybook = (updater: (pb: Playbook) => Playbook) => {
         setPlaybooks(prev => prev.map(pb =>
             pb.id === currentPlaybookId ? { ...updater(pb), updatedAt: Date.now() } : pb
         ));
     };
 
+    /** Updates the play in global storage. Strips any transient gridPosition. */
     const updateCurrentPlay = (updatedPlay: Play) => {
-        updateCurrentPlaybook(pb => ({
-            ...pb,
-            plays: pb.plays.map(p => p.id === updatedPlay.id ? updatedPlay : p)
-        }));
+        const { gridPosition: _gp, ...globalPlay } = updatedPlay as Play & { gridPosition?: any };
+        setGlobalPlays(prev => prev.map(p => p.id === globalPlay.id ? globalPlay : p));
     };
 
-    // Reset history whenever the active play changes
+    // ============================================
+    // UNDO / REDO
+    // ============================================
+
     useEffect(() => {
         setUndoStack([]);
         setRedoStack([]);
     }, [currentPlayId]);
 
-    // Snapshot the current play state before a discrete change
     const pushToUndoStack = () => {
         if (!currentPlay) return;
         setUndoStack(prev => [...prev.slice(-49), currentPlay]);
@@ -136,7 +188,7 @@ export function usePlaybook() {
         const newPlaybook: Playbook = {
             id: crypto.randomUUID(),
             name: name || `Playbook ${playbooks.length + 1}`,
-            plays: [],
+            entries: [],
             gridConfig: { columnNames: ['A', 'B', 'C', 'D', 'E'] },
             createdAt: Date.now(),
             updatedAt: Date.now()
@@ -153,9 +205,7 @@ export function usePlaybook() {
             alert('Cannot delete the last playbook');
             return;
         }
-
         setPlaybooks(prev => prev.filter(pb => pb.id !== id));
-
         if (currentPlaybookId === id) {
             const remaining = playbooks.filter(pb => pb.id !== id);
             setCurrentPlaybookId(remaining[0]?.id || '');
@@ -176,22 +226,23 @@ export function usePlaybook() {
 
     const handleNewPlay = () => {
         const defaultPlayers: Player[] = [
-            { id: crypto.randomUUID(), role: 'C', label: '', color: POSITIONS['C'].color, position: getPos(0, -1), routes: [] },
-            { id: crypto.randomUUID(), role: 'QB', label: '', color: POSITIONS['QB'].color, position: getPos(0, -4), routes: [] },
+            { id: crypto.randomUUID(), role: 'C',    label: '', color: POSITIONS['C'].color,    position: getPos(0,   -1), routes: [] },
+            { id: crypto.randomUUID(), role: 'QB',   label: '', color: POSITIONS['QB'].color,   position: getPos(0,   -4), routes: [] },
             { id: crypto.randomUUID(), role: 'WR-L', label: '', color: POSITIONS['WR-L'].color, position: getPos(-10, -1), routes: [] },
-            { id: crypto.randomUUID(), role: 'WR-R', label: '', color: POSITIONS['WR-R'].color, position: getPos(10, -1), routes: [] },
-            { id: crypto.randomUUID(), role: 'SR', label: '', color: POSITIONS['SR'].color, position: getPos(5, -1), routes: [] },
+            { id: crypto.randomUUID(), role: 'WR-R', label: '', color: POSITIONS['WR-R'].color, position: getPos(10,  -1), routes: [] },
+            { id: crypto.randomUUID(), role: 'SR',   label: '', color: POSITIONS['SR'].color,   position: getPos(5,   -1), routes: [] },
         ];
 
         const newPlay: Play = {
             id: crypto.randomUUID(),
-            name: `Play ${plays.length + 1}`,
+            name: `Play ${globalPlays.length + 1}`,
             players: defaultPlayers
         };
 
+        setGlobalPlays(prev => [...prev, newPlay]);
         updateCurrentPlaybook(pb => ({
             ...pb,
-            plays: [...pb.plays, newPlay]
+            entries: [...pb.entries, { playId: newPlay.id }]
         }));
 
         setCurrentPlayId(newPlay.id);
@@ -200,18 +251,16 @@ export function usePlaybook() {
     };
 
     const handleDeletePlay = (id: string) => {
+        // Remove from current playbook's entries only — play stays globally
         updateCurrentPlaybook(pb => ({
             ...pb,
-            plays: pb.plays.filter(p => p.id !== id)
+            entries: pb.entries.filter(e => e.playId !== id)
         }));
-
-        if (currentPlayId === id) {
-            setCurrentPlayId(null);
-        }
+        if (currentPlayId === id) setCurrentPlayId(null);
     };
 
     const handleCopyPlay = (id: string) => {
-        const playToCopy = plays.find(p => p.id === id);
+        const playToCopy = globalPlays.find(p => p.id === id);
         if (!playToCopy) return;
 
         const copiedPlay: Play = {
@@ -225,30 +274,23 @@ export function usePlaybook() {
                     ...route,
                     id: crypto.randomUUID()
                 }))
-            })),
-            gridPosition: undefined // Don't copy grid position
+            }))
         };
 
+        setGlobalPlays(prev => [...prev, copiedPlay]);
         updateCurrentPlaybook(pb => ({
             ...pb,
-            plays: [...pb.plays, copiedPlay]
+            entries: [...pb.entries, { playId: copiedPlay.id }]
         }));
-
         setCurrentPlayId(copiedPlay.id);
     };
 
     const handleUpdatePlayName = (id: string, name: string) => {
-        updateCurrentPlaybook(pb => ({
-            ...pb,
-            plays: pb.plays.map(p => p.id === id ? { ...p, name } : p)
-        }));
+        setGlobalPlays(prev => prev.map(p => p.id === id ? { ...p, name } : p));
     };
 
     const handleUpdatePlayTags = (id: string, tags: PlayTag[]) => {
-        updateCurrentPlaybook(pb => ({
-            ...pb,
-            plays: pb.plays.map(p => p.id === id ? { ...p, tags } : p)
-        }));
+        setGlobalPlays(prev => prev.map(p => p.id === id ? { ...p, tags } : p));
     };
 
     // ============================================
@@ -263,22 +305,12 @@ export function usePlaybook() {
 
         const updatedPlayer = { ...player, ...updates };
 
-        // If position changed and player has routes, shift them
         if (updates.position && player.routes.length > 0) {
             const dx = updates.position.x - player.position.x;
             const dy = updates.position.y - player.position.y;
-
-            // Calculate route shift based on motion
-            const routeShift = player.motion
-                ? { x: dx, y: dy }
-                : { x: dx, y: dy };
-
             updatedPlayer.routes = player.routes.map(r => ({
                 ...r,
-                points: r.points.map(pt => clampPoint({
-                    x: pt.x + routeShift.x,
-                    y: pt.y + routeShift.y
-                }))
+                points: r.points.map(pt => clampPoint({ x: pt.x + dx, y: pt.y + dy }))
             }));
         }
 
@@ -290,10 +322,8 @@ export function usePlaybook() {
 
     const handleSetPosition = (role: string) => {
         if (!selectedPlayer || !currentPlay) return;
-
         const positionData = POSITIONS[role as keyof typeof POSITIONS];
         if (!positionData) return;
-
         pushToUndoStack();
         handleUpdatePlayer(selectedPlayer.id, {
             role,
@@ -308,18 +338,18 @@ export function usePlaybook() {
 
         const formations = {
             'strong-left': [
-                { role: 'C', x: 0, y: -1 },
-                { role: 'QB', x: 0, y: -4 },
+                { role: 'C',    x: 0,   y: -1 },
+                { role: 'QB',   x: 0,   y: -4 },
                 { role: 'WR-L', x: -10, y: -1 },
-                { role: 'WR-R', x: 10, y: -1 },
-                { role: 'SR', x: -5, y: -1 },
+                { role: 'WR-R', x: 10,  y: -1 },
+                { role: 'SR',   x: -5,  y: -1 },
             ],
             'strong-right': [
-                { role: 'C', x: 0, y: -1 },
-                { role: 'QB', x: 0, y: -4 },
+                { role: 'C',    x: 0,   y: -1 },
+                { role: 'QB',   x: 0,   y: -4 },
                 { role: 'WR-L', x: -10, y: -1 },
-                { role: 'WR-R', x: 10, y: -1 },
-                { role: 'SR', x: 5, y: -1 },
+                { role: 'WR-R', x: 10,  y: -1 },
+                { role: 'SR',   x: 5,   y: -1 },
             ]
         };
 
@@ -327,7 +357,6 @@ export function usePlaybook() {
         const updatedPlayers = currentPlay.players.map((player, index) => {
             const formationPos = formation[index];
             if (!formationPos) return player;
-
             return {
                 ...player,
                 role: formationPos.role,
@@ -338,10 +367,7 @@ export function usePlaybook() {
             };
         });
 
-        updateCurrentPlay({
-            ...currentPlay,
-            players: updatedPlayers
-        });
+        updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
     };
 
     // ============================================
@@ -356,7 +382,6 @@ export function usePlaybook() {
         if (!selectedPlayer || !currentPlay) return;
         pushToUndoStack();
 
-        // Toggle: If this preset is already applied to this specific route type, remove it
         const existingRoute = selectedPlayer.routes.find(r => r.type === routeType);
         if (existingRoute?.preset === preset) {
             updateCurrentPlay({
@@ -377,18 +402,15 @@ export function usePlaybook() {
             id: crypto.randomUUID(),
             type: routeType,
             points,
-            preset // Store the preset ID for highlighting/toggling
-        };
-
-        const updatedPlayer = {
-            ...selectedPlayer,
-            routes: [...selectedPlayer.routes.filter(r => r.type !== routeType), newRoute]
+            preset
         };
 
         updateCurrentPlay({
             ...currentPlay,
             players: currentPlay.players.map(p =>
-                p.id === selectedPlayer.id ? updatedPlayer : p
+                p.id === selectedPlayer.id
+                    ? { ...p, routes: [...p.routes.filter(r => r.type !== routeType), newRoute] }
+                    : p
             )
         });
     };
@@ -396,7 +418,6 @@ export function usePlaybook() {
     const clearRoutes = () => {
         if (!selectedPlayer || !currentPlay) return;
         pushToUndoStack();
-
         updateCurrentPlay({
             ...currentPlay,
             players: currentPlay.players.map(p =>
@@ -423,19 +444,19 @@ export function usePlaybook() {
         const dx = motionTarget.x - (selectedPlayer.motion?.x || selectedPlayer.position.x);
         const dy = motionTarget.y - (selectedPlayer.motion?.y || selectedPlayer.position.y);
 
-        const updatedPlayer = {
-            ...selectedPlayer,
-            motion: motionTarget,
-            routes: selectedPlayer.routes.map(r => ({
-                ...r,
-                points: r.points.map(pt => clampPoint({ x: pt.x + dx, y: pt.y + dy }))
-            }))
-        };
-
         updateCurrentPlay({
             ...currentPlay,
             players: currentPlay.players.map(p =>
-                p.id === selectedPlayer.id ? updatedPlayer : p
+                p.id === selectedPlayer.id
+                    ? {
+                        ...p,
+                        motion: motionTarget,
+                        routes: p.routes.map(r => ({
+                            ...r,
+                            points: r.points.map(pt => clampPoint({ x: pt.x + dx, y: pt.y + dy }))
+                        }))
+                    }
+                    : p
             )
         });
 
@@ -449,83 +470,76 @@ export function usePlaybook() {
         const dx = selectedPlayer.position.x - selectedPlayer.motion.x;
         const dy = selectedPlayer.position.y - selectedPlayer.motion.y;
 
-        const updatedPlayer = {
-            ...selectedPlayer,
-            motion: null,
-            routes: selectedPlayer.routes.map(r => ({
-                ...r,
-                points: r.points.map(pt => clampPoint({ x: pt.x + dx, y: pt.y + dy }))
-            }))
-        };
-
         updateCurrentPlay({
             ...currentPlay,
             players: currentPlay.players.map(p =>
-                p.id === selectedPlayer.id ? updatedPlayer : p
+                p.id === selectedPlayer.id
+                    ? {
+                        ...p,
+                        motion: null,
+                        routes: p.routes.map(r => ({
+                            ...r,
+                            points: r.points.map(pt => clampPoint({ x: pt.x + dx, y: pt.y + dy }))
+                        }))
+                    }
+                    : p
             )
         });
     };
 
     // ============================================
-    // IMPORT/EXPORT
+    // IMPORT / EXPORT
     // ============================================
 
     const handleImportData = useCallback((data: string) => {
         try {
             const imported = JSON.parse(data);
 
-            // 1. Array handling
+            const importPlaybook = (pb: any) => {
+                const newId = crypto.randomUUID();
+
+                // Extract plays into global store
+                const incomingPlays: Play[] = (pb.plays || []).map((p: any) => {
+                    const { gridPosition: _gp, ...globalPlay } = p;
+                    return { ...globalPlay, id: p.id || crypto.randomUUID() };
+                });
+
+                const entries: PlaybookEntry[] = (pb.plays || []).map((p: any) => ({
+                    playId: p.id,
+                    ...(p.gridPosition ? { gridPosition: p.gridPosition } : {})
+                }));
+
+                setGlobalPlays(prev => {
+                    const existingIds = new Set(prev.map(p => p.id));
+                    return [...prev, ...incomingPlays.filter(p => !existingIds.has(p.id))];
+                });
+
+                const newPlaybook: Playbook = {
+                    id: newId,
+                    name: pb.name || 'Imported Playbook',
+                    entries: pb.entries || entries,
+                    gridConfig: pb.gridConfig || { columnNames: ['A', 'B', 'C', 'D', 'E'] },
+                    createdAt: Date.now(),
+                    updatedAt: Date.now()
+                };
+                setPlaybooks(prev => [...prev, newPlaybook]);
+            };
+
             if (Array.isArray(imported)) {
                 if (imported.length === 0) return true;
-
-                // Check if it's an array of Playbooks or an array of Plays
-                const isPlaybookArray = 'plays' in imported[0];
-
+                const isPlaybookArray = 'plays' in imported[0] || 'entries' in imported[0];
                 if (isPlaybookArray) {
-                    // New format: array of multiple playbooks
-                    const importedPlaybooks: Playbook[] = imported.map(pb => ({
-                        ...pb,
-                        id: crypto.randomUUID(),
-                        createdAt: Date.now(),
-                        updatedAt: Date.now()
-                    }));
-                    setPlaybooks(prev => [...prev, ...importedPlaybooks]);
+                    imported.forEach(importPlaybook);
                 } else {
-                    // Old format: array of plays export
-                    const newPlaybook: Playbook = {
-                        id: crypto.randomUUID(),
-                        name: 'Imported Plays',
-                        plays: imported.map((p: any) => ({ ...p, id: crypto.randomUUID() })),
-                        gridConfig: { columnNames: ['A', 'B', 'C', 'D', 'E'] },
-                        createdAt: Date.now(),
-                        updatedAt: Date.now()
-                    };
-                    setPlaybooks(prev => [...prev, newPlaybook]);
+                    // Array of plays — wrap in a playbook
+                    const fakePlaybook = { name: 'Imported Plays', plays: imported };
+                    importPlaybook(fakePlaybook);
                 }
-            }
-            // 2. Single object handling
-            else if (typeof imported === 'object' && imported !== null) {
-                if ('plays' in imported) {
-                    // Single Playbook object
-                    const newPlaybook: Playbook = {
-                        ...imported,
-                        id: crypto.randomUUID(),
-                        name: imported.name || 'Imported Playbook',
-                        createdAt: Date.now(),
-                        updatedAt: Date.now()
-                    };
-                    setPlaybooks(prev => [...prev, newPlaybook]);
+            } else if (typeof imported === 'object' && imported !== null) {
+                if ('plays' in imported || 'entries' in imported) {
+                    importPlaybook(imported);
                 } else if ('players' in imported) {
-                    // Single Play object
-                    const newPlaybook: Playbook = {
-                        id: crypto.randomUUID(),
-                        name: imported.name || 'Imported Play',
-                        plays: [{ ...imported, id: crypto.randomUUID() }],
-                        gridConfig: { columnNames: ['A', 'B', 'C', 'D', 'E'] },
-                        createdAt: Date.now(),
-                        updatedAt: Date.now()
-                    };
-                    setPlaybooks(prev => [...prev, newPlaybook]);
+                    importPlaybook({ name: imported.name || 'Imported Play', plays: [imported] });
                 }
             }
             return true;
@@ -539,8 +553,7 @@ export function usePlaybook() {
     const handleImportPlaybook = (file: File) => {
         const reader = new FileReader();
         reader.onload = (e) => {
-            const data = e.target?.result as string;
-            handleImportData(data);
+            handleImportData(e.target?.result as string);
         };
         reader.readAsText(file);
     };
@@ -561,13 +574,12 @@ export function usePlaybook() {
 
     const handleAddColumn = () => {
         updateCurrentPlaybook(pb => {
-            const nextCharCode = 65 + pb.gridConfig.columnNames.length; // 65 is 'A'
-            const nextColName = String.fromCharCode(nextCharCode);
+            const nextCharCode = 65 + pb.gridConfig.columnNames.length;
             return {
                 ...pb,
                 gridConfig: {
                     ...pb.gridConfig,
-                    columnNames: [...pb.gridConfig.columnNames, nextColName]
+                    columnNames: [...pb.gridConfig.columnNames, String.fromCharCode(nextCharCode)]
                 }
             };
         });
@@ -580,23 +592,16 @@ export function usePlaybook() {
                 ...pb.gridConfig,
                 columnNames: pb.gridConfig.columnNames.filter((_, i) => i !== index)
             },
-            plays: pb.plays.map(p => {
-                if (p.gridPosition) {
-                    if (p.gridPosition.column === index) {
-                        const { gridPosition, ...rest } = p;
-                        return rest as Play;
-                    }
-                    if (p.gridPosition.column > index) {
-                        return {
-                            ...p,
-                            gridPosition: {
-                                ...p.gridPosition,
-                                column: p.gridPosition.column - 1
-                            }
-                        };
-                    }
+            entries: pb.entries.map(e => {
+                if (!e.gridPosition) return e;
+                if (e.gridPosition.column === index) {
+                    const { gridPosition: _gp, ...rest } = e;
+                    return rest;
                 }
-                return p;
+                if (e.gridPosition.column > index) {
+                    return { ...e, gridPosition: { ...e.gridPosition, column: e.gridPosition.column - 1 } };
+                }
+                return e;
             })
         }));
     };
@@ -604,16 +609,16 @@ export function usePlaybook() {
     const handleAssignPlayToCell = (playId: string, row: number, col: number) => {
         updateCurrentPlaybook(pb => ({
             ...pb,
-            plays: pb.plays.map(p => {
-                if (p.id === playId) {
-                    return { ...p, gridPosition: { row, column: col } };
+            entries: pb.entries.map(e => {
+                if (e.playId === playId) {
+                    return { ...e, gridPosition: { row, column: col } };
                 }
-                // Remove any other play from this cell
-                if (p.gridPosition?.row === row && p.gridPosition?.column === col) {
-                    const { gridPosition, ...rest } = p;
-                    return rest as Play;
+                // Evict any other play from this cell
+                if (e.gridPosition?.row === row && e.gridPosition?.column === col) {
+                    const { gridPosition: _gp, ...rest } = e;
+                    return rest;
                 }
-                return p;
+                return e;
             })
         }));
     };
@@ -621,12 +626,12 @@ export function usePlaybook() {
     const handleRemovePlayFromCell = (row: number, col: number) => {
         updateCurrentPlaybook(pb => ({
             ...pb,
-            plays: pb.plays.map(p => {
-                if (p.gridPosition?.row === row && p.gridPosition?.column === col) {
-                    const { gridPosition, ...rest } = p;
-                    return rest as Play;
+            entries: pb.entries.map(e => {
+                if (e.gridPosition?.row === row && e.gridPosition?.column === col) {
+                    const { gridPosition: _gp, ...rest } = e;
+                    return rest;
                 }
-                return p;
+                return e;
             })
         }));
     };

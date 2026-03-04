@@ -1,4 +1,7 @@
 import type { Playbook, Play, Player, RouteSegment, Point, PlayTag } from '../types';
+
+// Old-format playbook shape used for import/export compatibility
+type SerializedPlaybook = Omit<Playbook, 'entries'> & { plays: Play[] };
 import { S } from './constants';
 
 const ROUTE_TYPE_MAP: Record<string, number> = {
@@ -35,13 +38,14 @@ export const fromBase64URL = (base64url: string): string => {
 };
 
 // VERSION 3: POSITIONAL ARRAYS (EXTREME)
-export const minifyPlaybook = (pb: Playbook): any => {
+// `plays` should be the current playbook's plays with gridPosition merged in from entries.
+export const minifyPlaybook = (pb: Playbook, plays: Play[]): any => {
     return [
         3, // Version
         pb.id,
         pb.name,
         pb.gridConfig.columnNames,
-        pb.plays.map(minifyPlay)
+        plays.map(minifyPlay)
     ];
 };
 
@@ -85,9 +89,9 @@ const minifyPoint = (p: Point): [number, number] => [toYards(p.x), toYards(p.y)]
 const unminifyPoint = (p: [number, number]): Point => ({ x: fromYards(p[0]), y: fromYards(p[1]) });
 
 // UNMINIFICATION (V3)
-export const unminifyPlaybook = (data: any): Playbook => {
-    if (!Array.isArray(data)) return data as Playbook;
-    if (data[0] !== 3) return data as unknown as Playbook;
+// Returns old-format shape (plays: Play[]) so handleImportData can migrate it.
+export const unminifyPlaybook = (data: any): SerializedPlaybook => {
+    if (!Array.isArray(data) || data[0] !== 3) return data as SerializedPlaybook;
 
     return {
         id: data[1],

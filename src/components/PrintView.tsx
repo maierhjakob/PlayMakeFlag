@@ -1,17 +1,18 @@
 import { MiniPlayPreview } from './MiniPlayPreview';
-import type { Playbook } from '@/types';
+import type { Playbook, Play } from '@/types';
 
 interface PrintViewProps {
     playbook: Playbook;
+    plays: Play[];
     playsPerPage: number;
 }
 
-export const PrintView: React.FC<PrintViewProps> = ({ playbook, playsPerPage }) => {
+export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerPage }) => {
     const ROWS = 4;
     const COLS = playbook.gridConfig.columnNames.length;
 
     const getPlayAtCell = (row: number, col: number) => {
-        return playbook.plays.find(p => p.gridPosition?.row === row && p.gridPosition?.column === col) || null;
+        return plays.find(p => p.gridPosition?.row === row && p.gridPosition?.column === col) || null;
     };
 
     // We render 'playsPerPage' number of grid cards.
