@@ -41,6 +41,7 @@ function App() {
     handleNewPlay,
     handleDeletePlay,
     handleCopyPlay,
+    handleMirrorPlay,
     handleUpdatePlayName,
     handleUpdatePlayTags,
     handleUpdatePlayer,
@@ -410,6 +411,7 @@ function App() {
           onSetMotionMode={() => setIsSettingMotion(!isSettingMotion)}
           onExportPlaybook={handleExportPlaybook}
           onCopyPlay={handleCopyPlay}
+          onMirrorPlay={handleMirrorPlay}
           activeRouteType={activeRouteType}
           onSetActiveRouteType={setActiveRouteType}
           isDrawing={isDrawing}

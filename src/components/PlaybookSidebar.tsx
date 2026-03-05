@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2, FolderOpen, MousePointer2, Copy, MoveRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, FolderOpen, MousePointer2, Copy, MoveRight, ChevronUp, ChevronDown, FlipHorizontal2 } from 'lucide-react';
 import { ROUTE_PRESETS } from '@/lib/routes';
 import { getPos, S } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,7 @@ interface PlaybookSidebarProps {
     onApplyRoute: (preset: any) => void;
     onExportPlaybook: () => void;
     onCopyPlay: (id: string) => void;
+    onMirrorPlay: (id: string) => void;
     activeRouteType: 'primary' | 'option' | 'check' | 'endzone';
     onSetActiveRouteType: (type: 'primary' | 'option' | 'check' | 'endzone') => void;
     isDrawing: boolean;
@@ -59,6 +60,7 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     onApplyRoute,
     onExportPlaybook,
     onCopyPlay,
+    onMirrorPlay,
     activeRouteType,
     onSetActiveRouteType,
     isDrawing,
@@ -149,7 +151,14 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                                 className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-blue-400 py-1.5 px-2 rounded text-xs font-medium border border-slate-700 transition-all flex items-center justify-center gap-1"
                                 title="Duplicate Play"
                             >
-                                <Copy size={12} /> Duplicate
+                                <Copy size={12} /> Dupe
+                            </button>
+                            <button
+                                onClick={() => onMirrorPlay(currentPlayId)}
+                                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-purple-400 py-1.5 px-2 rounded text-xs font-medium border border-slate-700 transition-all flex items-center justify-center gap-1"
+                                title="Create mirrored copy of this play"
+                            >
+                                <FlipHorizontal2 size={12} /> Mirror
                             </button>
                             <button
                                 onClick={() => {
@@ -161,7 +170,7 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                                 className="flex-1 bg-slate-800 hover:bg-red-900/40 text-slate-400 hover:text-red-400 py-1.5 px-2 rounded text-xs font-medium border border-slate-700 hover:border-red-900/30 transition-all flex items-center justify-center gap-1"
                                 title="Delete Play"
                             >
-                                <Trash2 size={12} /> Delete
+                                <Trash2 size={12} /> Del
                             </button>
                         </div>
                     )}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag, PlayFolder } from '@/types';
-import { POSITIONS, getPos, clampPoint } from '@/lib/constants';
+import { POSITIONS, getPos, clampPoint, FIELD_PIXEL_WIDTH } from '@/lib/constants';
 import { generateRoutePoints } from '@/lib/routes';
 import type { RoutePreset } from '@/lib/routes';
 
@@ -277,6 +277,31 @@ export function usePlaybook() {
             updatedAt: Date.now()
         })));
         if (currentPlayId === id) setCurrentPlayId(null);
+    };
+
+    const handleMirrorPlay = (id: string) => {
+        const src = globalPlays.find(p => p.id === id);
+        if (!src) return;
+        const mx = (x: number) => FIELD_PIXEL_WIDTH - x;
+        const mirroredPlay: Play = {
+            ...src,
+            id: crypto.randomUUID(),
+            name: `${src.name} (Mirror)`,
+            players: src.players.map(player => ({
+                ...player,
+                id: crypto.randomUUID(),
+                position: { ...player.position, x: mx(player.position.x) },
+                motion: player.motion ? { ...player.motion, x: mx(player.motion.x) } : null,
+                routes: player.routes.map(route => ({
+                    ...route,
+                    id: crypto.randomUUID(),
+                    points: route.points.map(pt => ({ ...pt, x: mx(pt.x) }))
+                }))
+            }))
+        };
+        setGlobalPlays(prev => [...prev, mirroredPlay]);
+        setCurrentPlayId(mirroredPlay.id);
+        setSelectedPlayerId(null);
     };
 
     const handleCopyPlay = (id: string) => {
@@ -809,6 +834,7 @@ export function usePlaybook() {
         handleNewPlay,
         handleDeletePlay,
         handleCopyPlay,
+        handleMirrorPlay,
         handleUpdatePlayName,
         handleUpdatePlayTags,
 
