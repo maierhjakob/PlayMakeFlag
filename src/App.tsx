@@ -71,8 +71,6 @@ function App() {
     handleToggleFolder,
     handleAssignPlayToFolder,
     handleReorderPlayInFolder,
-    handleAutoSortByTags,
-    handleAutoSortByFormation,
   } = usePlaybook();
 
   // Drawing state
@@ -236,10 +234,39 @@ function App() {
         e.preventDefault();
         redo();
       }
+
+      // Arrow keys navigate between plays — skip when typing in an input
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const tag = (document.activeElement as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+
+        const topFoldersSorted = [...folders]
+          .filter(f => !f.parentId)
+          .sort((a, b) => a.order - b.order);
+        const ordered: typeof plays = [];
+        for (const folder of topFoldersSorted) {
+          ordered.push(...plays.filter(p => p.folderId === folder.id));
+          const subs = [...folders]
+            .filter(f => f.parentId === folder.id)
+            .sort((a, b) => a.order - b.order);
+          for (const sub of subs) ordered.push(...plays.filter(p => p.folderId === sub.id));
+        }
+        ordered.push(...plays.filter(p => !p.folderId));
+
+        const idx = ordered.findIndex(p => p.id === currentPlayId);
+        const target = e.key === 'ArrowUp'
+          ? (idx > 0 ? ordered[idx - 1] : null)
+          : (idx < ordered.length - 1 ? ordered[idx + 1] : null);
+        if (target) {
+          setCurrentPlayId(target.id);
+          setSelectedPlayerId(null);
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDrawing, activeRoutePoints, setSelectedPlayerId, undo, redo]);
+  }, [isDrawing, activeRoutePoints, setSelectedPlayerId, undo, redo, plays, folders, currentPlayId, setCurrentPlayId]);
 
   // Handle shareable links and handshakes on mount
   useEffect(() => {
@@ -397,8 +424,6 @@ function App() {
           onToggleFolder={handleToggleFolder}
           onAssignPlayToFolder={handleAssignPlayToFolder}
           onReorderPlayInFolder={handleReorderPlayInFolder}
-          onAutoSortByTags={handleAutoSortByTags}
-          onAutoSortByFormation={handleAutoSortByFormation}
         />
 
         {/* Center - Field */}

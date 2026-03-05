@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ChevronRight, ChevronDown, GripVertical, FolderPlus, Pencil, Trash2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Play, PlayFolder } from '@/types';
@@ -14,8 +14,6 @@ interface FolderTreeProps {
     onRenameFolder: (id: string, name: string) => void;
     onAssignPlayToFolder: (playId: string, folderId: string | undefined) => void;
     onReorderPlayInFolder: (draggedId: string, targetId: string, folderId: string | undefined) => void;
-    onAutoSortByTags: () => void;
-    onAutoSortByFormation: () => void;
 }
 
 interface PlayRowProps {
@@ -35,6 +33,7 @@ const PlayRow: React.FC<PlayRowProps> = ({
 }) => (
     <div
         draggable
+        data-play-id={play.id}
         onDragStart={() => onDragStart(play.id)}
         onDragOver={(e) => { e.preventDefault(); onDragOver(e, play.id, folderId); }}
         onDrop={(e) => onDrop(e, play.id, folderId)}
@@ -63,6 +62,9 @@ const PlayRow: React.FC<PlayRowProps> = ({
     </div>
 );
 
+// Height of one folder header row in px — must match the rendered height of the header div.
+const FOLDER_HEADER_H = 26;
+
 export const FolderTree: React.FC<FolderTreeProps> = ({
     plays,
     folders,
@@ -74,8 +76,6 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
     onRenameFolder,
     onAssignPlayToFolder,
     onReorderPlayInFolder,
-    onAutoSortByTags,
-    onAutoSortByFormation,
 }) => {
     const [draggedPlayId, setDraggedPlayId] = useState<string | null>(null);
     const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
@@ -84,6 +84,41 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
     const [newFolderName, setNewFolderName] = useState('');
     const newFolderInputRef = useRef<HTMLInputElement>(null);
     const editInputRef = useRef<HTMLInputElement>(null);
+
+    // Scroll-based sticky tracking
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const sentinelRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    // IDs of top-level folders whose headers have scrolled past the top, in scroll order
+    const [stuckFolderIds, setStuckFolderIds] = useState<string[]>([]);
+
+    // Scroll the selected play row into view when currentPlayId changes externally
+    useEffect(() => {
+        if (!currentPlayId || !scrollRef.current) return;
+        const el = scrollRef.current.querySelector<HTMLElement>(`[data-play-id="${currentPlayId}"]`);
+        el?.scrollIntoView({ block: 'nearest' });
+    }, [currentPlayId]);
+
+    const handleScroll = useCallback(() => {
+        const container = scrollRef.current;
+        if (!container) return;
+        const containerTop = container.getBoundingClientRect().top;
+
+        const stuck: Array<{ id: string; naturalTop: number }> = [];
+        for (const [id, sentinel] of Object.entries(sentinelRefs.current)) {
+            if (!sentinel) continue;
+            const sentinelTop = sentinel.getBoundingClientRect().top;
+            if (sentinelTop < containerTop) {
+                // naturalTop: sentinel's position in scroll-space (stable for sorting)
+                const naturalTop = sentinelTop - containerTop + container.scrollTop;
+                stuck.push({ id, naturalTop });
+            }
+        }
+        stuck.sort((a, b) => a.naturalTop - b.naturalTop);
+        const newIds = stuck.map(s => s.id);
+        setStuckFolderIds(prev =>
+            prev.length === newIds.length && prev.every((id, i) => id === newIds[i]) ? prev : newIds
+        );
+    }, []);
 
     const startEditing = (folder: PlayFolder) => {
         setEditingFolderId(folder.id);
@@ -153,11 +188,23 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
 
     const uncategorizedPlays = plays.filter(p => !p.folderId);
 
-    const renderFolderHeader = (folder: PlayFolder, isSubFolder: boolean) => (
+    // Stack index → pixel offset for a folder that has scrolled past the top
+    const stickyTop = (folderId: string): number => {
+        const idx = stuckFolderIds.indexOf(folderId);
+        return idx === -1 ? 0 : idx * FOLDER_HEADER_H;
+    };
+
+    const renderFolderHeader = (folder: PlayFolder, isSubFolder: boolean, topPx?: number) => (
         <div
             key={folder.id}
-            className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-slate-800/50 group"
-            style={{ paddingLeft: isSubFolder ? '20px' : '8px' }}
+            className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-slate-800/50 group sticky z-10 bg-slate-900",
+                isSubFolder && "bg-slate-900/90"
+            )}
+            style={{
+                paddingLeft: isSubFolder ? '20px' : '8px',
+                top: topPx !== undefined ? `${topPx}px` : undefined,
+            }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleDropOnFolder(e, folder.id)}
         >
@@ -229,29 +276,19 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
     );
 
     return (
-        <div className="text-sm">
+        <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="max-h-64 overflow-y-auto text-sm scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900"
+        >
             {/* Top bar */}
             <div className="flex items-center gap-1 px-2 pb-2 border-b border-slate-700/50 mb-1">
                 <button
-                    onClick={onAutoSortByTags}
-                    className="flex-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 py-1 px-1.5 rounded border border-slate-700 transition-colors truncate"
-                    title="Re-sort by Tags"
-                >
-                    Re-sort Tags
-                </button>
-                <button
-                    onClick={onAutoSortByFormation}
-                    className="flex-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 py-1 px-1.5 rounded border border-slate-700 transition-colors truncate"
-                    title="Re-sort by Formation keywords in play names"
-                >
-                    Re-sort Formation
-                </button>
-                <button
                     onClick={() => startCreating('root')}
-                    className="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 py-1 px-1.5 rounded border border-slate-700 transition-colors shrink-0 flex items-center gap-0.5"
+                    className="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 py-1 px-1.5 rounded border border-slate-700 transition-colors flex items-center gap-0.5"
                     title="New folder"
                 >
-                    <Plus size={11} /> Folder
+                    <Plus size={11} /> New Folder
                 </button>
             </div>
 
@@ -276,11 +313,14 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
             {/* Folders */}
             {topFolders.map(folder => (
                 <div key={folder.id}>
-                    {renderFolderHeader(folder, false)}
+                    {/* Sentinel: zero-height marker at the folder's natural position.
+                        Used by handleScroll to detect when this folder has scrolled past the top. */}
+                    <div ref={el => { sentinelRefs.current[folder.id] = el; }} style={{ height: 0 }} />
+
+                    {renderFolderHeader(folder, false, stickyTop(folder.id))}
 
                     {folder.isExpanded && (
                         <div>
-                            {/* Plays directly in this top-level folder */}
                             {playsInFolder(folder.id).map(play => (
                                 <PlayRow
                                     key={play.id}
@@ -296,7 +336,6 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                                 />
                             ))}
 
-                            {/* Sub-folders */}
                             {subFolders(folder.id).map(sub => (
                                 <div key={sub.id}>
                                     {renderFolderHeader(sub, true)}
@@ -317,7 +356,6 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                                 </div>
                             ))}
 
-                            {/* New sub-folder input */}
                             {creatingIn === folder.id && (
                                 <div className="px-2 py-1" style={{ paddingLeft: '24px' }}>
                                     <input

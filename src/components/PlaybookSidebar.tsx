@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2, FolderOpen, MousePointer2, Copy, MoveRight } from 'lucide-react';
+import { Plus, Trash2, FolderOpen, MousePointer2, Copy, MoveRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { ROUTE_PRESETS } from '@/lib/routes';
 import { getPos, S } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -39,8 +39,6 @@ interface PlaybookSidebarProps {
     onToggleFolder: (id: string) => void;
     onAssignPlayToFolder: (playId: string, folderId: string | undefined) => void;
     onReorderPlayInFolder: (draggedId: string, targetId: string, folderId: string | undefined) => void;
-    onAutoSortByTags: () => void;
-    onAutoSortByFormation: () => void;
     className?: string;
 }
 
@@ -73,10 +71,30 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     onToggleFolder,
     onAssignPlayToFolder,
     onReorderPlayInFolder,
-    onAutoSortByTags,
-    onAutoSortByFormation,
     className
 }) => {
+    // Build ordered play list matching the folder tree's visual order
+    const topFoldersSorted = [...folders]
+        .filter(f => !f.parentId)
+        .sort((a, b) => a.order - b.order);
+    const orderedPlays: typeof plays = [];
+    for (const folder of topFoldersSorted) {
+        orderedPlays.push(...plays.filter(p => p.folderId === folder.id));
+        const subs = [...folders]
+            .filter(f => f.parentId === folder.id)
+            .sort((a, b) => a.order - b.order);
+        for (const sub of subs) {
+            orderedPlays.push(...plays.filter(p => p.folderId === sub.id));
+        }
+    }
+    orderedPlays.push(...plays.filter(p => !p.folderId));
+
+    const currentIdx = orderedPlays.findIndex(p => p.id === currentPlayId);
+    const prevPlay = currentIdx > 0 ? orderedPlays[currentIdx - 1] : null;
+    const nextPlay = currentIdx !== -1 && currentIdx < orderedPlays.length - 1
+        ? orderedPlays[currentIdx + 1]
+        : null;
+
     return (
         <div className={cn("flex flex-col h-full bg-slate-900 text-white w-72 border-r border-slate-700 font-sans", className)}>
             {/* Fixed Header */}
@@ -87,8 +105,28 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
 
                 {/* Play Folder Tree */}
                 <div className="space-y-2">
-                    <label className="text-[10px] text-slate-500 uppercase font-semibold">Plays</label>
-                    <div className="max-h-64 overflow-y-auto rounded border border-slate-700 bg-slate-900/50 py-1">
+                    <div className="flex items-center justify-between">
+                        <label className="text-[10px] text-slate-500 uppercase font-semibold">Plays</label>
+                        <div className="flex gap-0.5">
+                            <button
+                                onClick={() => prevPlay && onSelectPlay(prevPlay.id)}
+                                disabled={!prevPlay}
+                                className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-25 disabled:cursor-default transition-colors"
+                                title={prevPlay ? `Previous: ${prevPlay.name}` : 'No previous play'}
+                            >
+                                <ChevronUp size={14} />
+                            </button>
+                            <button
+                                onClick={() => nextPlay && onSelectPlay(nextPlay.id)}
+                                disabled={!nextPlay}
+                                className="p-0.5 text-slate-500 hover:text-slate-200 disabled:opacity-25 disabled:cursor-default transition-colors"
+                                title={nextPlay ? `Next: ${nextPlay.name}` : 'No next play'}
+                            >
+                                <ChevronDown size={14} />
+                            </button>
+                        </div>
+                    </div>
+                    <div className="border border-slate-700 bg-slate-900/50">
                         <FolderTree
                             plays={plays}
                             folders={folders}
@@ -100,8 +138,6 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                             onRenameFolder={onRenameFolder}
                             onAssignPlayToFolder={onAssignPlayToFolder}
                             onReorderPlayInFolder={onReorderPlayInFolder}
-                            onAutoSortByTags={onAutoSortByTags}
-                            onAutoSortByFormation={onAutoSortByFormation}
                         />
                     </div>
 
