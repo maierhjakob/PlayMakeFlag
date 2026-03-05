@@ -13,7 +13,7 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
     play,
     width = 51,
     height = 70,
-    strokeWidth = 1.2,
+    strokeWidth = 1.1,
     className = ''
 }) => {
     // Field dimensions (25 yards wide @ 25px/yard)
@@ -136,7 +136,7 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
                     const arrowSize = strokeWidth * 2.5;
                     arrowhead = (
                         <path
-                            d={`M -${arrowSize} -${arrowSize / 2} L 0 0 L -${arrowSize} ${arrowSize / 2} Z`}
+                            d={`M -${arrowSize} -${arrowSize / 2} L 0 0 L -${arrowSize} ${arrowSize / 2} L -${arrowSize * 0.55} 0 Z`}
                             fill={route.type === 'option' ? 'white' : routeColor}
                             stroke={routeColor}
                             strokeWidth={strokeWidth * 0.66}

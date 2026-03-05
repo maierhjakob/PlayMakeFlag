@@ -68,7 +68,7 @@ export const RoutePath: React.FC<RoutePathProps> = ({ segment, color, isSelected
             />
             {/* Arrowhead */}
             <path
-                d={`M -${arrowSize} -${arrowSize / 2} L 0 0 L -${arrowSize} ${arrowSize / 2} Z`}
+                d={`M -${arrowSize} -${arrowSize / 2} L 0 0 L -${arrowSize} ${arrowSize / 2} L -${arrowSize * 0.55} 0 Z`}
                 fill={segment.type === 'option' ? 'white' : strokeColor}
                 stroke={strokeColor}
                 strokeWidth={segment.type === 'option' ? 2 : 0}
