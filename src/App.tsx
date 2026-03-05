@@ -64,6 +64,11 @@ function App() {
     handleAssignPlayToCell,
     handleRemovePlayFromCell,
     handleImportData,
+    // Saved routes
+    savedRoutes,
+    handleSaveRoute,
+    handleDeleteSavedRoute,
+    handleApplySavedRoute,
     // Folders
     folders,
     handleCreateFolder,
@@ -419,6 +424,10 @@ function App() {
           // Motion props
           isSettingMotion={isSettingMotion}
           onClearMotion={handleClearMotion}
+          savedRoutes={savedRoutes}
+          onSaveRoute={handleSaveRoute}
+          onDeleteSavedRoute={handleDeleteSavedRoute}
+          onApplySavedRoute={(id, type) => handleApplySavedRoute(id, type)}
           folders={folders}
           onCreateFolder={handleCreateFolder}
           onDeleteFolder={handleDeleteFolder}

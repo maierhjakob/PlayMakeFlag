@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag, PlayFolder } from '@/types';
+import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag, PlayFolder, SavedRoute } from '@/types';
 import { POSITIONS, getPos, clampPoint, FIELD_PIXEL_WIDTH } from '@/lib/constants';
 import { generateRoutePoints } from '@/lib/routes';
 import type { RoutePreset } from '@/lib/routes';
@@ -100,6 +100,12 @@ function loadFolders(): PlayFolder[] {
     return [];
 }
 
+function loadSavedRoutes(): SavedRoute[] {
+    const saved = localStorage.getItem('global_saved_routes');
+    if (saved) return JSON.parse(saved);
+    return [];
+}
+
 // ============================================
 // HOOK
 // ============================================
@@ -124,6 +130,7 @@ export function usePlaybook() {
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
     const [isSettingMotion, setIsSettingMotion] = useState(false);
     const [folders, setFolders] = useState<PlayFolder[]>(loadFolders);
+    const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>(loadSavedRoutes);
 
     const currentPlaybook = playbooks.find(pb => pb.id === currentPlaybookId) || playbooks[0] || null;
 
@@ -154,6 +161,10 @@ export function usePlaybook() {
     useEffect(() => {
         localStorage.setItem('global_folders', JSON.stringify(folders));
     }, [folders]);
+
+    useEffect(() => {
+        localStorage.setItem('global_saved_routes', JSON.stringify(savedRoutes));
+    }, [savedRoutes]);
 
     // ============================================
     // CORE UPDATERS
@@ -655,6 +666,43 @@ export function usePlaybook() {
     };
 
     // ============================================
+    // SAVED ROUTES
+    // ============================================
+
+    const handleSaveRoute = (name: string, routeType: RouteType) => {
+        if (!selectedPlayer) return;
+        const route = selectedPlayer.routes.find(r => r.type === routeType);
+        if (!route || route.points.length < 2) return;
+        const start = route.points[0];
+        const relativePoints = route.points.map(p => ({ x: p.x - start.x, y: p.y - start.y }));
+        setSavedRoutes(prev => [...prev, { id: crypto.randomUUID(), name, relativePoints }]);
+    };
+
+    const handleDeleteSavedRoute = (id: string) => {
+        setSavedRoutes(prev => prev.filter(r => r.id !== id));
+    };
+
+    const handleApplySavedRoute = (savedRouteId: string, routeType: RouteType) => {
+        if (!selectedPlayer || !currentPlay) return;
+        const saved = savedRoutes.find(r => r.id === savedRouteId);
+        if (!saved) return;
+        pushToUndoStack();
+        const startPos = calculateRouteStart(selectedPlayer);
+        const points = saved.relativePoints.map(p =>
+            clampPoint({ x: startPos.x + p.x, y: startPos.y + p.y })
+        );
+        const newRoute: RouteSegment = { id: crypto.randomUUID(), type: routeType, points };
+        updateCurrentPlay({
+            ...currentPlay,
+            players: currentPlay.players.map(p =>
+                p.id === selectedPlayer.id
+                    ? { ...p, routes: [...p.routes.filter(r => r.type !== routeType), newRoute] }
+                    : p
+            )
+        });
+    };
+
+    // ============================================
     // IMPORT / EXPORT
     // ============================================
 
@@ -873,6 +921,12 @@ export function usePlaybook() {
         handleRemoveColumn,
         handleAssignPlayToCell,
         handleRemovePlayFromCell,
+
+        // Saved routes
+        savedRoutes,
+        handleSaveRoute,
+        handleDeleteSavedRoute,
+        handleApplySavedRoute,
 
         // Folders
         folders,

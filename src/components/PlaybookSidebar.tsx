@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Plus, Trash2, FolderOpen, MousePointer2, Copy, MoveRight, ChevronUp, ChevronDown, FlipHorizontal2 } from 'lucide-react';
 import { ROUTE_PRESETS } from '@/lib/routes';
 import { getPos, S } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { Play, Player, PlayTag, PlayFolder } from '@/types';
+import type { Play, Player, PlayTag, PlayFolder, SavedRoute } from '@/types';
 import { FolderTree } from '@/components/FolderTree';
 
 interface PlaybookSidebarProps {
@@ -32,6 +32,11 @@ interface PlaybookSidebarProps {
     isSettingMotion: boolean;
     onSetMotionMode: () => void;
     onClearMotion: () => void;
+    // Saved route props
+    savedRoutes: SavedRoute[];
+    onSaveRoute: (name: string, routeType: 'primary' | 'option' | 'check' | 'endzone') => void;
+    onDeleteSavedRoute: (id: string) => void;
+    onApplySavedRoute: (savedRouteId: string, routeType: 'primary' | 'option' | 'check' | 'endzone') => void;
     // Folder props
     folders: PlayFolder[];
     onCreateFolder: (name: string, parentId?: string) => void;
@@ -66,6 +71,10 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     isDrawing,
     onFinishDrawing,
     onClearMotion,
+    savedRoutes,
+    onSaveRoute,
+    onDeleteSavedRoute,
+    onApplySavedRoute,
     folders,
     onCreateFolder,
     onDeleteFolder,
@@ -75,6 +84,9 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     onReorderPlayInFolder,
     className
 }) => {
+    const [savingRouteName, setSavingRouteName] = useState('');
+    const [isSavingRoute, setIsSavingRoute] = useState(false);
+
     // Build ordered play list matching the folder tree's visual order
     const topFoldersSorted = [...folders]
         .filter(f => !f.parentId)
@@ -486,6 +498,74 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                                             </button>
                                         );
                                     })}
+                                </div>
+                            </div>
+
+                            {/* Saved Routes */}
+                            <div className="col-span-2 mt-1">
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <div className="text-[10px] text-slate-500 uppercase font-semibold">Saved Routes</div>
+                                    {selectedPlayer.routes.find(r => r.type === activeRouteType) && !isSavingRoute && (
+                                        <button
+                                            onClick={() => { setIsSavingRoute(true); setSavingRouteName(''); }}
+                                            className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-0.5"
+                                        >
+                                            <Plus size={10} /> Save current
+                                        </button>
+                                    )}
+                                </div>
+                                {isSavingRoute && (
+                                    <div className="flex gap-1 mb-1.5">
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            value={savingRouteName}
+                                            onChange={e => setSavingRouteName(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && savingRouteName.trim()) {
+                                                    onSaveRoute(savingRouteName.trim(), activeRouteType);
+                                                    setIsSavingRoute(false);
+                                                }
+                                                if (e.key === 'Escape') setIsSavingRoute(false);
+                                            }}
+                                            placeholder="Route name…"
+                                            className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500"
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                if (savingRouteName.trim()) {
+                                                    onSaveRoute(savingRouteName.trim(), activeRouteType);
+                                                }
+                                                setIsSavingRoute(false);
+                                            }}
+                                            className="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-xs"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
+                                )}
+                                {savedRoutes.length === 0 && !isSavingRoute && (
+                                    <div className="text-[10px] text-slate-600 italic">No saved routes yet</div>
+                                )}
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    {savedRoutes.map(sr => (
+                                        <div key={sr.id} className="relative group">
+                                            <button
+                                                onClick={() => onApplySavedRoute(sr.id, activeRouteType)}
+                                                className="w-full px-1 py-1.5 rounded text-[10px] border transition-all truncate bg-slate-700 hover:bg-purple-800/50 text-slate-200 border-slate-600 hover:border-purple-500"
+                                                title={sr.name}
+                                            >
+                                                {sr.name}
+                                            </button>
+                                            <button
+                                                onClick={() => onDeleteSavedRoute(sr.id)}
+                                                className="absolute -top-1 -right-1 hidden group-hover:flex w-4 h-4 bg-red-900 hover:bg-red-700 text-white rounded-full text-[9px] items-center justify-center"
+                                                title="Delete saved route"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 

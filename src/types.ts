@@ -46,6 +46,13 @@ export interface Play {
     folderId?: string;
 }
 
+export interface SavedRoute {
+    id: string;
+    name: string;
+    /** Points relative to the route start (first point is always {x:0, y:0}). */
+    relativePoints: Point[];
+}
+
 export interface PlayFolder {
     id: string;
     name: string;
