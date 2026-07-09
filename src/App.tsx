@@ -9,6 +9,7 @@ import { PrintView } from '@/components/PrintView'
 import type { Point, RouteType, RouteSegment } from '@/types'
 import { usePlaybook } from '@/hooks/usePlaybook'
 import { S, clampPoint } from '@/lib/constants'
+import { cn } from '@/lib/utils'
 import {
   minifyPlaybook,
   unminifyPlaybook,
@@ -79,6 +80,11 @@ function App() {
     handleReorderPlayInFolder,
   } = usePlaybook();
 
+  // Mobile layout state
+  const [mobileTab, setMobileTab] = useState<'plays' | 'field' | 'grid'>('field');
+  const [fieldScale, setFieldScale] = useState(1);
+  const fieldContainerRef = useRef<HTMLDivElement>(null);
+
   // Drawing state
   const [isDrawing, setIsDrawing] = useState(false);
   const [activeRouteType, setActiveRouteType] = useState<RouteType>('primary');
@@ -117,10 +123,34 @@ function App() {
     }, 100);
   };
 
+  useEffect(() => {
+    const update = () => {
+      if (window.innerWidth < 768) {
+        setFieldScale(Math.min(1, window.innerWidth / 641));
+      } else {
+        setFieldScale(1);
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  useEffect(() => {
+    const el = fieldContainerRef.current;
+    if (!el) return;
+    const preventScroll = (e: TouchEvent) => {
+      if (isDrawing || draggedPlayer || draggedPoint) e.preventDefault();
+    };
+    el.addEventListener('touchmove', preventScroll, { passive: false });
+    return () => el.removeEventListener('touchmove', preventScroll);
+  }, [isDrawing, draggedPlayer, draggedPoint]);
+
   const startDrawing = () => {
     if (!selectedPlayer) return;
     setDrawingType(activeRouteType);
     setIsDrawing(true);
+    setMobileTab('field');
     // Start from motion end if exists, else position
     const startPos = calculateRouteStart(selectedPlayer);
     setActiveRoutePoints([startPos]);
@@ -165,8 +195,8 @@ function App() {
       return;
     }
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) / fieldScale;
+    const y = (e.clientY - rect.top) / fieldScale;
 
     // Snap to 0.5 yards (S is pixels per yard)
     const snap = S / 2;
@@ -358,8 +388,38 @@ function App() {
 
     wasDraggingRef.current = true;
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) / fieldScale;
+    const y = (e.clientY - rect.top) / fieldScale;
+    const snapped = snapToGrid({ x, y });
+
+    if (draggedPoint) {
+      const updatedPlayers = currentPlay.players.map(p => {
+        if (p.id !== draggedPoint.playerId) return p;
+        return {
+          ...p,
+          routes: p.routes.map(r => {
+            if (r.id !== draggedPoint.routeId) return r;
+            const newPoints = [...r.points];
+            newPoints[draggedPoint.pointIndex] = clampPoint(snapped);
+            return { ...r, points: newPoints };
+          })
+        };
+      });
+      updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
+    } else if (draggedPlayer) {
+      handleUpdatePlayer(draggedPlayer, { position: clampPoint(snapped) });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!draggedPoint && !draggedPlayer) return;
+    if (!currentPlay) return;
+
+    wasDraggingRef.current = true;
+    const touch = e.touches[0];
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (touch.clientX - rect.left) / fieldScale;
+    const y = (touch.clientY - rect.top) / fieldScale;
     const snapped = snapToGrid({ x, y });
 
     if (draggedPoint) {
@@ -391,10 +451,11 @@ function App() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950">
-      <main className="flex-1 flex overflow-hidden">
+    <div className="h-dvh flex flex-col bg-slate-950">
+      <main className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Sidebar */}
         <PlaybookSidebar
+          className={cn(mobileTab === 'plays' ? 'flex md:flex' : 'hidden md:flex', 'w-full md:w-72')}
           plays={plays}
           currentPlayId={currentPlayId}
           selectedPlayer={selectedPlayer}
@@ -402,6 +463,7 @@ function App() {
             setCurrentPlayId(id);
             setSelectedPlayerId(null);
             cancelDrawing();
+            setMobileTab('field');
           }}
           onNewPlay={handleNewPlay}
           onDeletePlay={handleDeletePlay}
@@ -413,7 +475,7 @@ function App() {
           onSetFormation={handleFormation}
           onApplyRoute={(preset) => handleApplyRoute(preset, activeRouteType)}
           onSetPosition={handleSetPosition}
-          onSetMotionMode={() => setIsSettingMotion(!isSettingMotion)}
+          onSetMotionMode={() => { setIsSettingMotion(!isSettingMotion); if (!isSettingMotion) setMobileTab('field'); }}
           onExportPlaybook={handleExportPlaybook}
           onCopyPlay={handleCopyPlay}
           onMirrorPlay={handleMirrorPlay}
@@ -438,8 +500,8 @@ function App() {
         />
 
         {/* Center - Field */}
-        <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto">
-          <div className="p-8 flex items-start gap-4">
+        <div className={cn("flex-1 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto", mobileTab === 'field' ? 'flex' : 'hidden md:flex')}>
+          <div className="p-4 md:p-8 flex items-start gap-4">
             <div className="flex flex-col items-center gap-2">
               {/* Tags above the field */}
               {currentPlay?.tags && currentPlay.tags.length > 0 && (
@@ -455,12 +517,19 @@ function App() {
                   ))}
                 </div>
               )}
-              <div className="relative">
+              <div
+                ref={fieldContainerRef}
+                className="relative"
+                style={{ width: 625 * fieldScale, height: 625 * fieldScale }}
+              >
+                <div style={{ transform: `scale(${fieldScale})`, transformOrigin: 'top left', width: 625, height: 625 }}>
                 <Field
                   onClick={handleFieldClick}
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
                   onMouseLeave={handleMouseUp}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleMouseUp}
                   className={isDrawing ? 'cursor-crosshair' : isSettingMotion ? 'cursor-alias' : 'cursor-default'}
                   showRaster={isDrawing || isSettingMotion || !!draggedPoint || !!draggedPlayer}
                 >
@@ -542,6 +611,15 @@ function App() {
                                 pointIndex: idx
                               });
                             }}
+                            onTouchStart={(e) => {
+                              e.stopPropagation();
+                              pushToUndoStack();
+                              setDraggedPoint({
+                                playerId: selectedPlayer.id,
+                                routeId: route.id,
+                                pointIndex: idx
+                              });
+                            }}
                           />
                         ))
                       ))}
@@ -573,6 +651,7 @@ function App() {
                     />
                   ))}
                 </Field>
+                </div>
               </div>
             </div>
 
@@ -581,6 +660,7 @@ function App() {
 
         {/* Right Sidebar - Playbook Grid */}
         <PlaybookGrid
+          className={cn(mobileTab === 'grid' ? 'flex md:flex' : 'hidden md:flex', 'w-full md:w-[490px]')}
           playbooks={playbooks}
           currentPlaybookId={currentPlaybookId}
           onSelectPlaybook={setCurrentPlaybookId}
@@ -599,10 +679,59 @@ function App() {
             setCurrentPlayId(id);
             setSelectedPlayerId(null);
             cancelDrawing();
+            setMobileTab('field');
           }}
           onOpenPrintSettings={() => setIsPrintModalOpen(true)}
         />
       </main>
+
+      {/* Mobile: floating draw action bar */}
+      {mobileTab === 'field' && selectedPlayer && (
+        <div className="md:hidden fixed z-50 inset-x-0 bottom-16 px-4 flex gap-2" style={{ paddingBottom: 0 }}>
+          {isDrawing ? (
+            <>
+              <button
+                onClick={finishDrawing}
+                className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold shadow-xl text-sm"
+              >
+                ✓ Finish Route
+              </button>
+              <button
+                onClick={cancelDrawing}
+                className="bg-red-900/70 text-red-300 border border-red-800 px-5 py-3 rounded-xl font-bold shadow-xl text-sm"
+              >
+                ✗
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={startDrawing}
+              className="flex-1 bg-blue-700 text-white py-3 rounded-xl font-bold shadow-xl text-sm"
+            >
+              ✦ Draw Route
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Mobile bottom navigation */}
+      <nav
+        className="md:hidden flex border-t border-slate-700 bg-slate-900/95 backdrop-blur-sm shrink-0"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {(['plays', 'field', 'grid'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setMobileTab(tab)}
+            className={cn(
+              'flex-1 py-3 text-xs font-semibold uppercase tracking-wide transition-colors',
+              mobileTab === tab ? 'text-blue-400' : 'text-slate-500'
+            )}
+          >
+            {tab === 'plays' ? 'Plays' : tab === 'field' ? 'Field' : 'Grid'}
+          </button>
+        ))}
+      </nav>
 
       {/* Modals & Print Layers */}
       <PrintModal

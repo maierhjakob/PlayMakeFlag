@@ -22,6 +22,11 @@ export const PlayerToken: React.FC<PlayerTokenProps> = ({ player, isSelected, is
                 onSelect?.(player.id);
                 onDragStart?.(player.id);
             }}
+            onTouchStart={(e) => {
+                e.stopPropagation();
+                onSelect?.(player.id);
+                onDragStart?.(player.id);
+            }}
             onClick={(e) => e.stopPropagation()}
             className={cn(
                 "absolute w-8 h-8 rounded-full border-2 border-slate-700 flex items-center justify-center text-xs font-bold shadow-md cursor-move z-20 text-white -translate-x-1/2 -translate-y-1/2",
