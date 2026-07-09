@@ -46,6 +46,7 @@ interface PlaybookSidebarProps {
     onAssignPlayToFolder: (playId: string, folderId: string | undefined) => void;
     onReorderPlayInFolder: (draggedId: string, targetId: string, folderId: string | undefined) => void;
     className?: string;
+    style?: React.CSSProperties;
 }
 
 export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
@@ -82,7 +83,8 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     onToggleFolder,
     onAssignPlayToFolder,
     onReorderPlayInFolder,
-    className
+    className,
+    style
 }) => {
     const [savingRouteName, setSavingRouteName] = useState('');
     const [isSavingRoute, setIsSavingRoute] = useState(false);
@@ -110,7 +112,7 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
         : null;
 
     return (
-        <div className={cn("flex flex-col h-full bg-slate-900 text-white w-72 border-r border-slate-700 font-sans", className)}>
+        <div style={style} className={cn("flex flex-col h-full bg-slate-900 text-white w-72 border-r border-slate-700 font-sans", className)}>
             {/* Fixed Header */}
             <div className="p-4 border-b border-slate-700 bg-slate-950/50">
                 <h2 className="text-xl font-bold flex items-center gap-2 text-blue-400 mb-3">

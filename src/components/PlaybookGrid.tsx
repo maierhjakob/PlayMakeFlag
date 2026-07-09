@@ -25,6 +25,7 @@ interface PlaybookGridProps {
     onAddColumn: () => void;
     onRemoveColumn: (index: number) => void;
     className?: string;
+    style?: React.CSSProperties;
 }
 
 export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
@@ -44,7 +45,8 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     onAddColumn,
     onRemoveColumn,
     onOpenPrintSettings,
-    className
+    className,
+    style
 }) => {
     const [editingColumn, setEditingColumn] = useState<number | null>(null);
     const [editValue, setEditValue] = useState('');
@@ -86,7 +88,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     };
 
     return (
-        <div className={cn("flex flex-col h-full bg-slate-900 text-white w-[490px] border-l border-slate-700 font-sans", className)}>
+        <div style={style} className={cn("flex flex-col h-full bg-slate-900 text-white w-[490px] border-l border-slate-700 font-sans", className)}>
             {/* Header */}
             <div className="p-4 border-b border-slate-700 bg-slate-950/50 space-y-3">
                 <div className="flex items-center justify-between">

@@ -83,7 +83,13 @@ function App() {
   // Mobile layout state
   const [mobileTab, setMobileTab] = useState<'plays' | 'field' | 'grid'>('field');
   const [fieldScale, setFieldScale] = useState(1);
+  const [isMobile, setIsMobile] = useState(false);
   const fieldContainerRef = useRef<HTMLDivElement>(null);
+
+  // Resizable sidebar widths (desktop only)
+  const [leftWidth, setLeftWidth] = useState(() => Number(localStorage.getItem('pmf_leftWidth')) || 288);
+  const [rightWidth, setRightWidth] = useState(() => Number(localStorage.getItem('pmf_rightWidth')) || 490);
+  const resizingRef = useRef<'left' | 'right' | null>(null);
 
   // Drawing state
   const [isDrawing, setIsDrawing] = useState(false);
@@ -127,14 +133,50 @@ function App() {
     const update = () => {
       if (window.innerWidth < 768) {
         setFieldScale(Math.min(1, window.innerWidth / 641));
+        setIsMobile(true);
       } else {
         setFieldScale(1);
+        setIsMobile(false);
       }
     };
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
+
+  // Sidebar resize drag handling
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!resizingRef.current) return;
+      if (resizingRef.current === 'left') {
+        setLeftWidth(Math.min(600, Math.max(200, e.clientX)));
+      } else {
+        setRightWidth(Math.min(700, Math.max(200, window.innerWidth - e.clientX)));
+      }
+    };
+    const onUp = () => {
+      if (!resizingRef.current) return;
+      resizingRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  useEffect(() => { localStorage.setItem('pmf_leftWidth', String(leftWidth)); }, [leftWidth]);
+  useEffect(() => { localStorage.setItem('pmf_rightWidth', String(rightWidth)); }, [rightWidth]);
+
+  const startResize = (side: 'left' | 'right') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = side;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
   useEffect(() => {
     const el = fieldContainerRef.current;
@@ -455,7 +497,8 @@ function App() {
       <main className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Sidebar */}
         <PlaybookSidebar
-          className={cn(mobileTab === 'plays' ? 'flex md:flex' : 'hidden md:flex', 'w-full md:w-72')}
+          className={cn(mobileTab === 'plays' ? 'flex md:flex' : 'hidden md:flex', 'w-full md:w-auto shrink-0')}
+          style={isMobile ? undefined : { width: leftWidth }}
           plays={plays}
           currentPlayId={currentPlayId}
           selectedPlayer={selectedPlayer}
@@ -497,6 +540,12 @@ function App() {
           onToggleFolder={handleToggleFolder}
           onAssignPlayToFolder={handleAssignPlayToFolder}
           onReorderPlayInFolder={handleReorderPlayInFolder}
+        />
+
+        {/* Left resize handle */}
+        <div
+          onMouseDown={startResize('left')}
+          className="hidden md:block w-1 shrink-0 cursor-col-resize bg-slate-700 hover:bg-blue-500 transition-colors"
         />
 
         {/* Center - Field */}
@@ -658,9 +707,16 @@ function App() {
           </div>
         </div>
 
+        {/* Right resize handle */}
+        <div
+          onMouseDown={startResize('right')}
+          className="hidden md:block w-1 shrink-0 cursor-col-resize bg-slate-700 hover:bg-blue-500 transition-colors"
+        />
+
         {/* Right Sidebar - Playbook Grid */}
         <PlaybookGrid
-          className={cn(mobileTab === 'grid' ? 'flex md:flex' : 'hidden md:flex', 'w-full md:w-[490px]')}
+          className={cn(mobileTab === 'grid' ? 'flex md:flex' : 'hidden md:flex', 'w-full md:w-auto shrink-0')}
+          style={isMobile ? undefined : { width: rightWidth }}
           playbooks={playbooks}
           currentPlaybookId={currentPlaybookId}
           onSelectPlaybook={setCurrentPlaybookId}
