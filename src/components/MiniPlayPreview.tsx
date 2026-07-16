@@ -67,12 +67,12 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
             />
 
             {/* 7 Yard Marks (Side lines) */}
-            <line x1="0" y1={getYFromLOS(7)} x2={getX(30)} y2={getYFromLOS(7)} stroke="#94a3b8" strokeWidth="0.5" />
-            <line x1={getX(625 - 30)} y1={getYFromLOS(7)} x2={width} y2={getYFromLOS(7)} stroke="#94a3b8" strokeWidth="0.5" />
+            <line x1="0" y1={getYFromLOS(7)} x2={getX(30)} y2={getYFromLOS(7)} stroke="#000000" strokeWidth="0.5" />
+            <line x1={getX(625 - 30)} y1={getYFromLOS(7)} x2={width} y2={getYFromLOS(7)} stroke="#000000" strokeWidth="0.5" />
 
             {/* 5 Yard Marks (Side lines) */}
-            <line x1="0" y1={getYFromLOS(5)} x2={getX(15)} y2={getYFromLOS(5)} stroke="#94a3b8" strokeWidth="0.5" />
-            <line x1={getX(625 - 15)} y1={getYFromLOS(5)} x2={width} y2={getYFromLOS(5)} stroke="#94a3b8" strokeWidth="0.5" />
+            <line x1="0" y1={getYFromLOS(5)} x2={getX(15)} y2={getYFromLOS(5)} stroke="#000000" strokeWidth="0.5" />
+            <line x1={getX(625 - 15)} y1={getYFromLOS(5)} x2={width} y2={getYFromLOS(5)} stroke="#000000" strokeWidth="0.5" />
 
             {/* Line of scrimmage (Black) */}
             <line
