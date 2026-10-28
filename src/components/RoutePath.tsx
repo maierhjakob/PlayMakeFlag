@@ -5,9 +5,11 @@ interface RoutePathProps {
     segment: RouteSegment;
     color: string;
     isSelected?: boolean;
+    /** When set, the line is clickable (with a wider invisible hit area) */
+    onSelect?: () => void;
 }
 
-export const RoutePath: React.FC<RoutePathProps> = ({ segment, color, isSelected }) => {
+export const RoutePath: React.FC<RoutePathProps> = ({ segment, color, isSelected, onSelect }) => {
     if (segment.points.length < 2) return null;
 
     // Styles based on route type
@@ -66,6 +68,18 @@ export const RoutePath: React.FC<RoutePathProps> = ({ segment, color, isSelected
                 strokeDasharray={strokeDasharray}
                 opacity={strokeOpacity}
             />
+            {onSelect && (
+                <path
+                    d={pathData}
+                    stroke="transparent"
+                    strokeWidth={14}
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="pointer-events-auto cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); onSelect(); }}
+                />
+            )}
             {/* Arrowhead */}
             <path
                 d={`M -${arrowSize} -${arrowSize / 2} L 0 0 L -${arrowSize} ${arrowSize / 2} L -${arrowSize * 0.55} 0 Z`}

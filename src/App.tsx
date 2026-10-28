@@ -483,6 +483,42 @@ function App() {
     }
   };
 
+  // Insert a new point into a route (splitting a segment or extending the end) and start dragging it
+  const startInsertPoint = (routeId: string, insertIndex: number, point: Point) => {
+    if (!selectedPlayer || !currentPlay) return;
+    pushToUndoStack();
+    const updatedPlayers = currentPlay.players.map(p => {
+      if (p.id !== selectedPlayer.id) return p;
+      return {
+        ...p,
+        routes: p.routes.map(r => {
+          if (r.id !== routeId) return r;
+          const newPoints = [...r.points];
+          newPoints.splice(insertIndex, 0, clampPoint(snapToGrid(point)));
+          return { ...r, points: newPoints };
+        })
+      };
+    });
+    updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
+    setDraggedPoint({ playerId: selectedPlayer.id, routeId, pointIndex: insertIndex });
+  };
+
+  // Remove the last line of a route (its end point), keeping at least one line
+  const removeLastLine = (routeId: string) => {
+    if (!selectedPlayer || !currentPlay) return;
+    pushToUndoStack();
+    const updatedPlayers = currentPlay.players.map(p => {
+      if (p.id !== selectedPlayer.id) return p;
+      return {
+        ...p,
+        routes: p.routes.map(r =>
+          r.id === routeId && r.points.length > 2 ? { ...r, points: r.points.slice(0, -1) } : r
+        )
+      };
+    });
+    updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
+  };
+
   const handleMouseUp = () => {
     setDraggedPoint(null);
     setDraggedPlayer(null);
@@ -616,6 +652,10 @@ function App() {
                           segment={route}
                           color={player.color}
                           isSelected={selectedPlayerId === player.id}
+                          onSelect={isDrawing || isSettingMotion ? undefined : () => {
+                            setSelectedPlayerId(player.id);
+                            setActiveRouteType(route.type);
+                          }}
                         />
                       ))
                     ))}
@@ -626,6 +666,10 @@ function App() {
                           segment={route}
                           color={player.color}
                           isSelected={selectedPlayerId === player.id}
+                          onSelect={isDrawing || isSettingMotion ? undefined : () => {
+                            setSelectedPlayerId(player.id);
+                            setActiveRouteType(route.type);
+                          }}
                         />
                       ))
                     ))}
@@ -640,6 +684,77 @@ function App() {
 
                   {selectedPlayer && !isDrawing && (
                     <svg className="absolute inset-0 pointer-events-none z-20" width="100%" height="100%">
+                      {/* Segment midpoints: drag to split a line into two */}
+                      {selectedPlayer.routes.map(route => (
+                        route.points.slice(1).map((point, idx) => {
+                          const prev = route.points[idx];
+                          const mid = { x: (prev.x + point.x) / 2, y: (prev.y + point.y) / 2 };
+                          return (
+                            <circle
+                              key={`${route.id}-mid-${idx}`}
+                              cx={mid.x}
+                              cy={mid.y}
+                              r={4}
+                              fill={selectedPlayer.color}
+                              fillOpacity={0.5}
+                              stroke="white"
+                              strokeWidth={1.5}
+                              className="pointer-events-auto cursor-copy"
+                              onMouseDown={(e) => { e.stopPropagation(); startInsertPoint(route.id, idx + 1, mid); }}
+                              onTouchStart={(e) => { e.stopPropagation(); startInsertPoint(route.id, idx + 1, mid); }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <title>Drag to add a break</title>
+                            </circle>
+                          );
+                        })
+                      ))}
+
+                      {/* Past the arrow tip: drag "+" to add another line at the end, click "-" to remove the last one */}
+                      {selectedPlayer.routes.map(route => {
+                        if (route.points.length < 2) return null;
+                        const last = route.points[route.points.length - 1];
+                        const prev = route.points[route.points.length - 2];
+                        const len = Math.hypot(last.x - prev.x, last.y - prev.y);
+                        if (len === 0) return null;
+                        const ext = clampPoint({
+                          x: last.x + (last.x - prev.x) / len * S * 1.5,
+                          y: last.y + (last.y - prev.y) / len * S * 1.5
+                        });
+                        if (ext.x === last.x && ext.y === last.y) return null;
+                        // "-" sits beside the "+", perpendicular to the last line
+                        const remove = {
+                          x: ext.x - (last.y - prev.y) / len * 16,
+                          y: ext.y + (last.x - prev.x) / len * 16
+                        };
+                        return (
+                          <g key={`${route.id}-ext`}>
+                            <g
+                              className="pointer-events-auto cursor-copy"
+                              onMouseDown={(e) => { e.stopPropagation(); startInsertPoint(route.id, route.points.length, ext); }}
+                              onTouchStart={(e) => { e.stopPropagation(); startInsertPoint(route.id, route.points.length, ext); }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <title>Drag to extend the route</title>
+                              <circle cx={ext.x} cy={ext.y} r={6} fill="white" stroke={selectedPlayer.color} strokeWidth={1.5} strokeDasharray="2,2" />
+                              <path d={`M ${ext.x - 3} ${ext.y} H ${ext.x + 3} M ${ext.x} ${ext.y - 3} V ${ext.y + 3}`} stroke={selectedPlayer.color} strokeWidth={1.5} />
+                            </g>
+                            {route.points.length > 2 && (
+                              <g
+                                className="pointer-events-auto cursor-pointer"
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); removeLastLine(route.id); }}
+                              >
+                                <title>Remove the last line</title>
+                                <circle cx={remove.x} cy={remove.y} r={6} fill="white" stroke="#ef4444" strokeWidth={1.5} strokeDasharray="2,2" />
+                                <path d={`M ${remove.x - 3} ${remove.y} H ${remove.x + 3}`} stroke="#ef4444" strokeWidth={1.5} />
+                              </g>
+                            )}
+                          </g>
+                        );
+                      })}
+
                       {selectedPlayer.routes.map(route => (
                         route.points.map((point, idx) => (
                           <circle
@@ -669,6 +784,7 @@ function App() {
                                 pointIndex: idx
                               });
                             }}
+                            onClick={(e) => e.stopPropagation()}
                           />
                         ))
                       ))}
