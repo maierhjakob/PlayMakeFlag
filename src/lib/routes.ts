@@ -117,8 +117,8 @@ export const generateRoutePoints = (start: Point, preset: RoutePreset): Point[] 
             addRel(5 * dirIn, 0); // Cut in
             break;
         case 'slant':
-            addAbsDepth(0, 1);
-            addRel(3 * dirIn, 2); // Diagonal
+            addAbsDepth(0, 3); // Straight stem to 3y
+            addRel(4 * dirIn, 3); // Break inside at ~45°
             break;
         case 'post':
             addAbsDepth(0, 7); // Break at 7y
@@ -131,7 +131,7 @@ export const generateRoutePoints = (start: Point, preset: RoutePreset): Point[] 
             break;
         case 'post-in':
             addAbsDepth(0, 7);
-            addRel(2 * dirIn, 3.2);
+            addRel(2 * dirIn, 3); // Up to the 10y line
             addRel(10 * dirIn, 0);
             break;
         case 'corner':
