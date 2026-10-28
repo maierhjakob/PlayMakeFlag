@@ -848,7 +848,7 @@ function App() {
 
               {/* Route controls for the selected player, below the field */}
               <RouteControls
-                className="w-full max-w-[880px]"
+                className="w-full max-w-[880px] big:max-w-[1000px]"
                 style={{ minWidth: FIELD_PX * fieldScale }}
                 selectedPlayer={selectedPlayer}
                 activeRouteType={activeRouteType}

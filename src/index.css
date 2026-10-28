@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Screens tall enough that the field fits at full size with room to spare: larger route controls */
+@custom-variant big (@media (min-height: 1000px));
+
 @theme {
   --color-background: 222.2 84% 4.9%;
   --color-foreground: 210 40% 98%;
