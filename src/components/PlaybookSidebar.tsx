@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, FolderOpen, MousePointer2, Copy, MoveRight, ChevronUp, ChevronDown, FlipHorizontal2 } from 'lucide-react';
+import { Plus, Trash2, FolderOpen, MousePointer2, Copy, MoveRight, ChevronUp, ChevronDown, FlipHorizontal2, WandSparkles } from 'lucide-react';
 import { ROUTE_PRESETS } from '@/lib/routes';
 import { getPos, S } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { Play, Player, PlayTag, PlayFolder, SavedRoute } from '@/types';
 import { FolderTree } from '@/components/FolderTree';
 import { ColorSwatches } from '@/components/ColorSwatches';
+import { generatePlayName } from '@/lib/playNames';
 
 interface PlaybookSidebarProps {
     plays: Play[];
@@ -183,13 +184,26 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                 {currentPlayId && (
                     <div className="mt-3">
                         <label className="text-[10px] text-slate-500 uppercase font-semibold">Play Name</label>
-                        <input
-                            type="text"
-                            value={plays.find(p => p.id === currentPlayId)?.name || ''}
-                            onChange={(e) => onUpdatePlayName(currentPlayId, e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
-                            placeholder="Enter play name..."
-                        />
+                        <div className="flex gap-1.5">
+                            <input
+                                type="text"
+                                value={plays.find(p => p.id === currentPlayId)?.name || ''}
+                                onChange={(e) => onUpdatePlayName(currentPlayId, e.target.value)}
+                                className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
+                                placeholder="Enter play name..."
+                            />
+                            <button
+                                onClick={() => {
+                                    const play = plays.find(p => p.id === currentPlayId);
+                                    const name = play && generatePlayName(play);
+                                    if (name) onUpdatePlayName(currentPlayId, name);
+                                }}
+                                className="shrink-0 px-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-blue-300 border border-slate-700 rounded transition-colors"
+                                title="Generate name from the routes"
+                            >
+                                <WandSparkles size={13} />
+                            </button>
+                        </div>
                     </div>
                 )}
 
