@@ -9,7 +9,7 @@ import type { Play, PlayFolder, Player } from '@/types';
 // ============================================
 
 // A receiver within this many yards of the center (left or right) is "tight"
-const TIGHT_YARDS = 3;
+const TIGHT_YARDS = 4;
 // Two receivers on the same side within this many yards of each other form a "Double"
 const DOUBLE_YARDS = 3;
 
@@ -31,12 +31,17 @@ export const FORMATION_NAMES: Record<Formation, string> = {
  * Each one is detected as its own formation by detectFormation; mirror the x for strong side left.
  */
 export const FORMATION_ALIGNMENTS: Record<Formation, number[]> = {
-    spread: [-10, 5, 10],
+    // Weak side receiver on the quarter of the field (6.25 yd, on the 0.5 yd grid)
+    spread: [-6.5, 5, 10],
     twins: [-10, 2, 10],
     trips: [-2, 2, 10],
-    tight: [-3, 1.5, 3],
-    double: [-10, 7, 10],
-    overload: [4, 7, 10],
+    // Same 2 yd spacing as the inside receivers in Trips
+    tight: [-2, 2, 4],
+    // Strong side pair side by side around the quarter of the field (5.5 / 7, centered on 6.25)
+    double: [-6.5, 5.5, 7],
+    // The weak side receiver (farthest from its usual spot) 2 yd from the center like in Tight,
+    // the slot halfway between it and the outside receiver
+    overload: [2, 6, 10],
 };
 
 /** Formation from where the receivers stand after motion, relative to the center. */
