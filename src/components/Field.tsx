@@ -53,13 +53,20 @@ export const Field: React.FC<FieldProps> = ({ className, children, showRaster, .
                 {/* 10 Yard Line (Full Gray Line) */}
                 <line x1="0" y1={getLineY(10)} x2="100%" y2={getLineY(10)} stroke="gray" strokeWidth="2" />
 
-                {/* 7 Yard Marks (Side Lines) */}
-                <line x1="0" y1={getLineY(7)} x2="30" y2={getLineY(7)} stroke="#0f172a" strokeWidth="2" />
-                <line x1={widthPx - 30} y1={getLineY(7)} x2={widthPx} y2={getLineY(7)} stroke="#0f172a" strokeWidth="2" />
+                {/* 7 Yard Marks (Side Lines, 1 yard long) */}
+                <line x1="0" y1={getLineY(7)} x2={YARD_TO_PX} y2={getLineY(7)} stroke="#0f172a" strokeWidth="2" />
+                <line x1={widthPx - YARD_TO_PX} y1={getLineY(7)} x2={widthPx} y2={getLineY(7)} stroke="#0f172a" strokeWidth="2" />
 
-                {/* 5 Yard Marks (Smaller Side Lines) */}
-                <line x1="0" y1={getLineY(5)} x2="15" y2={getLineY(5)} stroke="#0f172a" strokeWidth="1" />
-                <line x1={widthPx - 15} y1={getLineY(5)} x2={widthPx} y2={getLineY(5)} stroke="#0f172a" strokeWidth="1" />
+                {/* 5 Yard Marks (Side Lines, 1 yard long, thicker than the 7 yard marks) */}
+                <line x1="0" y1={getLineY(5)} x2={YARD_TO_PX} y2={getLineY(5)} stroke="#0f172a" strokeWidth="3" />
+                <line x1={widthPx - YARD_TO_PX} y1={getLineY(5)} x2={widthPx} y2={getLineY(5)} stroke="#0f172a" strokeWidth="3" />
+
+                {/* Yard numbers (left side, just above each line) */}
+                {[10, 7, 5].map(yards => (
+                    <text key={`yard-${yards}`} x="3" y={getLineY(yards) - 4} fill="#0f172a" fontSize="10" fontFamily="sans-serif">
+                        {yards}
+                    </text>
+                ))}
 
                 {/* Optional: Top of Play Area (20 Yards) boundary? */}
                 {/* <line x1="0" y1={getLineY(20)} x2="100%" y2={getLineY(20)} stroke="#0f172a" strokeWidth="1" strokeDasharray="5,5" /> */}
