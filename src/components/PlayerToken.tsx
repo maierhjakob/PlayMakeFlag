@@ -9,9 +9,11 @@ interface PlayerTokenProps {
     isDragging?: boolean;
     onSelect?: (id: string) => void;
     onDragStart?: (id: string) => void;
+    /** The field is rotated by 180°: turn the label back */
+    flipped?: boolean;
 }
 
-export const PlayerToken: React.FC<PlayerTokenProps> = ({ player, isSelected, isDragging, onSelect, onDragStart }) => {
+export const PlayerToken: React.FC<PlayerTokenProps> = ({ player, isSelected, isDragging, onSelect, onDragStart, flipped }) => {
     return (
         <motion.div
             initial={{ x: player.position.x, y: player.position.y }}
@@ -37,7 +39,7 @@ export const PlayerToken: React.FC<PlayerTokenProps> = ({ player, isSelected, is
             }}
             title={`${player.role} - ${player.label}`}
         >
-            {player.label}
+            <span className={flipped ? 'inline-block rotate-180' : undefined}>{player.label}</span>
         </motion.div>
     );
 };

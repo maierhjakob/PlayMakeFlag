@@ -30,6 +30,36 @@ export type PlayTag = {
     color: string;
 };
 
+/** Zone a defender covers: an ellipse relative to the defender's position (px). */
+export type DefenderZone = {
+    dx: number;
+    dy: number;
+    rx: number;
+    ry: number;
+};
+
+export type Defender = {
+    id: string;
+    position: Point;
+    zone?: DefenderZone | null;
+    /** Offensive player this defender covers in man coverage */
+    manTargetId?: string | null;
+    /** Rushes the quarterback */
+    rush?: boolean;
+    color?: string;
+    /** Arrow the defender runs: points after its position */
+    path?: Point[];
+    /** The arrow was set by a coverage (replaced when the coverage changes); drawn or edited arrows are kept */
+    pathFromCoverage?: boolean;
+};
+
+export type Coverage = 'man' | 'cover-1' | 'cover-2' | 'cover-2-invert' | 'cover-2-invert-left' | 'cover-2-invert-right' | 'cover-3';
+
+export type PlayDefense = {
+    coverage?: Coverage | null;
+    defenders: Defender[];
+};
+
 export interface Play {
     id: string;
     name: string;
@@ -44,6 +74,8 @@ export interface Play {
     ballPosition?: Point;
     tags?: PlayTag[];
     folderId?: string;
+    /** Defense to check the play against (defense view) */
+    defense?: PlayDefense;
 }
 
 export interface SavedRoute {

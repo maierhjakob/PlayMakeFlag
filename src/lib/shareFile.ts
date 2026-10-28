@@ -1,0 +1,55 @@
+import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+
+interface ShareFileOptions {
+    title: string;
+    text: string;
+}
+
+const toBase64 = async (file: File) => {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(binary);
+};
+
+/**
+ * Hand a file to the system share sheet: the native one in the app, the Web Share API in browsers that
+ * support sharing files, otherwise download it. Returns 'downloaded' when it fell back to a download.
+ */
+export const shareFile = async (file: File, { title, text }: ShareFileOptions): Promise<'shared' | 'downloaded'> => {
+    if (Capacitor.isNativePlatform()) {
+        const { uri } = await Filesystem.writeFile({
+            path: file.name.replace(/[^\w.-]/g, '_'),
+            data: await toBase64(file),
+            directory: Directory.Cache,
+        });
+        try {
+            await Share.share({ title, text, files: [uri], dialogTitle: title });
+        } catch {
+            // Share sheet dismissed
+        }
+        return 'shared';
+    }
+
+    if (navigator.canShare?.({ files: [file] })) {
+        try {
+            await navigator.share({ files: [file], title, text });
+            return 'shared';
+        } catch (e) {
+            // Dismissed by the user: done. Anything else: fall back to a download
+            if (e instanceof DOMException && e.name === 'AbortError') return 'shared';
+        }
+    }
+
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    a.click();
+    URL.revokeObjectURL(url);
+    return 'downloaded';
+};

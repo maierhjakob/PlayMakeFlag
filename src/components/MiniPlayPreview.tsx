@@ -1,5 +1,7 @@
 import React from 'react';
 import type { Play } from '@/types';
+import { DefenseLayer } from './DefenseLayer';
+import { defenderColor, NEUTRAL_OFFENSE_COLOR } from '@/lib/defense';
 
 interface MiniPlayPreviewProps {
     play: Play;
@@ -8,6 +10,8 @@ interface MiniPlayPreviewProps {
     strokeWidth?: number;
     /** Draw the yard numbers in the margin left of the field instead of above the lines */
     yardNumbersOutside?: boolean;
+    /** Also draw the play's defense (zones, man lines, rushers, X marks) */
+    showDefense?: boolean;
     className?: string;
 }
 
@@ -20,7 +24,8 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
     height = 70,
     strokeWidth = 1.1,
     className = '',
-    yardNumbersOutside = false
+    yardNumbersOutside = false,
+    showDefense = false
 }) => {
     // Field dimensions (25 yards wide @ 25px/yard)
     const VIRTUAL_WIDTH = 625;
@@ -47,6 +52,9 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
     };
 
     const LOS_Y = getYFromLOS(0);
+
+    // With the defense shown the offense is drawn without its colors, as in the editor's defense view
+    const offenseColor = (color: string) => (showDefense && play.defense ? NEUTRAL_OFFENSE_COLOR : color);
 
     // Flatten all routes to sort them by type (primary routes on top)
     const allRoutes = play.players.flatMap(player =>
@@ -103,6 +111,16 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
                 stroke="#000000" strokeWidth="0.5"
             />
 
+            {/* Defense under the offense's routes */}
+            {showDefense && play.defense && (
+                <DefenseLayer
+                    play={play}
+                    defense={play.defense}
+                    toCanvas={p => ({ x: getX(p.x), y: getY(p.y) })}
+                    yard={width / 25}
+                />
+            )}
+
             {/* 1. Motion paths */}
             {play.players.map(player => {
                 if (!player.motion) return null;
@@ -120,7 +138,7 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
                             `${startX},${endY}`,
                             `${endX},${endY}`
                         ].join(' ')}
-                        stroke={player.color}
+                        stroke={offenseColor(player.color)}
                         strokeWidth={strokeWidth}
                         strokeOpacity="0.5"
                         fill="none"
@@ -137,7 +155,7 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
 
                 let arrowhead = null;
                 const routeColor = route.type === 'check' ? '#000000' :
-                    route.type === 'endzone' ? '#f472b6' : player.color;
+                    route.type === 'endzone' ? '#f472b6' : offenseColor(player.color);
 
                 if (secondLast && lastPoint) {
                     const lpx = getX(lastPoint.x);
@@ -201,7 +219,20 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
                     cx={getX(player.position.x)}
                     cy={getY(player.position.y)}
                     r={strokeWidth * 1.5}
-                    fill={player.color}
+                    fill={offenseColor(player.color)}
+                    stroke="#000000"
+                    strokeWidth={strokeWidth * 0.4}
+                />
+            ))}
+
+            {/* 4. Defender dots */}
+            {showDefense && play.defense?.defenders.map((defender, i) => (
+                <circle
+                    key={`defender-${defender.id}`}
+                    cx={getX(defender.position.x)}
+                    cy={getY(defender.position.y)}
+                    r={strokeWidth * 1.5}
+                    fill={defenderColor(defender, i)}
                     stroke="#000000"
                     strokeWidth={strokeWidth * 0.4}
                 />

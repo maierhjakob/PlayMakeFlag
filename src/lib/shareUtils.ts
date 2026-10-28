@@ -1,4 +1,4 @@
-import type { Playbook, Play, Player, RouteSegment, Point, PlayTag } from '../types';
+import type { Playbook, Play, Player, RouteSegment, Point, PlayTag, PlayDefense } from '../types';
 
 // Old-format playbook shape used for import/export compatibility
 type SerializedPlaybook = Omit<Playbook, 'entries'> & { plays: Play[] };
@@ -56,9 +56,37 @@ const minifyPlay = (p: Play): any => {
         p.players.map(minifyPlayer),
         p.tags?.map(minifyTag) || [],
         p.gridPosition ? [p.gridPosition.row, p.gridPosition.column] : null,
-        p.ballPosition ? minifyPoint(p.ballPosition) : null
+        p.ballPosition ? minifyPoint(p.ballPosition) : null,
+        // Added later as an optional last element, so older versions simply ignore it
+        p.defense ? minifyDefense(p.defense) : null
     ];
 };
+
+const minifyDefense = (d: PlayDefense): any => [
+    d.coverage || null,
+    d.defenders.map(def => [
+        def.id,
+        minifyPoint(def.position),
+        def.zone ? [def.zone.dx, def.zone.dy, def.zone.rx, def.zone.ry].map(toYards) : null,
+        def.manTargetId || null,
+        def.rush ? 1 : 0,
+        def.color || null,
+        def.path?.length ? def.path.map(minifyPoint) : null,
+    ]),
+];
+
+const unminifyDefense = (data: any): PlayDefense => ({
+    coverage: data[0] || null,
+    defenders: data[1].map((def: any) => ({
+        id: def[0],
+        position: unminifyPoint(def[1]),
+        zone: def[2] ? { dx: fromYards(def[2][0]), dy: fromYards(def[2][1]), rx: fromYards(def[2][2]), ry: fromYards(def[2][3]) } : null,
+        manTargetId: def[3] || null,
+        rush: def[4] === 1,
+        color: def[5] || undefined,
+        path: def[6] ? def[6].map(unminifyPoint) : undefined,
+    })),
+});
 
 const minifyPlayer = (p: Player): any => {
     return [
@@ -111,6 +139,7 @@ const unminifyPlay = (data: any): Play => {
         tags: data[3].map(unminifyTag),
         gridPosition: data[4] ? { row: data[4][0], column: data[4][1] } : undefined,
         ballPosition: data[5] ? unminifyPoint(data[5]) : undefined,
+        defense: data[6] ? unminifyDefense(data[6]) : undefined,
     };
 };
 

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag, SavedRoute } from '@/types';
+import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag, SavedRoute, PlayDefense } from '@/types';
 import { buildPlayFolders, playFolderId, FORMATION_ALIGNMENTS, type Formation } from '@/lib/playFolders';
 import { POSITIONS, getPos, clampPoint, FIELD_PIXEL_WIDTH, S } from '@/lib/constants';
 import { generateRoutePoints } from '@/lib/routes';
+import { applyCoverage, copyDefense, mirrorDefense } from '@/lib/defense';
 import type { RoutePreset } from '@/lib/routes';
 
 // ============================================
@@ -288,13 +289,15 @@ export function usePlaybook() {
         const src = globalPlays.find(p => p.id === id);
         if (!src) return;
         const mx = (x: number) => FIELD_PIXEL_WIDTH - x;
+        const playerIds = new Map(src.players.map(p => [p.id, crypto.randomUUID()]));
         const mirroredPlay: Play = {
             ...src,
             id: crypto.randomUUID(),
             name: `${src.name} (Mirror)`,
+            defense: src.defense ? copyDefense(mirrorDefense(src.defense, mx), playerIds) : undefined,
             players: src.players.map(player => ({
                 ...player,
-                id: crypto.randomUUID(),
+                id: playerIds.get(player.id)!,
                 position: { ...player.position, x: mx(player.position.x) },
                 motion: player.motion ? { ...player.motion, x: mx(player.motion.x) } : null,
                 routes: player.routes.map(route => ({
@@ -313,13 +316,15 @@ export function usePlaybook() {
         const playToCopy = globalPlays.find(p => p.id === id);
         if (!playToCopy) return;
 
+        const playerIds = new Map(playToCopy.players.map(p => [p.id, crypto.randomUUID()]));
         const copiedPlay: Play = {
             ...playToCopy,
             id: crypto.randomUUID(),
             name: `${playToCopy.name} (Copy)`,
+            defense: playToCopy.defense ? copyDefense(playToCopy.defense, playerIds) : undefined,
             players: playToCopy.players.map(player => ({
                 ...player,
-                id: crypto.randomUUID(),
+                id: playerIds.get(player.id)!,
                 routes: player.routes.map(route => ({
                     ...route,
                     id: crypto.randomUUID()
@@ -372,6 +377,11 @@ export function usePlaybook() {
             ...currentPlay,
             players: currentPlay.players.map(p => p.id === id ? updatedPlayer : p)
         });
+    };
+
+    const handleUpdateDefense = (defense: PlayDefense | undefined) => {
+        if (!currentPlay) return;
+        updateCurrentPlay({ ...currentPlay, defense });
     };
 
     /** Routes are drawn in player order (later on top), so moving a player changes which routes cover which. */
@@ -433,7 +443,10 @@ export function usePlaybook() {
             };
         });
 
-        updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
+        // The defenders line up across from the receivers: keep them on their receivers in the current coverage
+        const play = { ...currentPlay, players: updatedPlayers };
+        const coverage = currentPlay.defense?.coverage;
+        updateCurrentPlay(coverage ? { ...play, defense: applyCoverage(play, currentPlay.defense!, coverage) } : play);
     };
 
     // ============================================
@@ -802,6 +815,7 @@ export function usePlaybook() {
         // Player actions
         handleUpdatePlayer,
         handleMovePlayerLayer,
+        handleUpdateDefense,
         handleSetPosition,
         handleFormation,
 

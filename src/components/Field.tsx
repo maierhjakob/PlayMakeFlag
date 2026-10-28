@@ -3,13 +3,15 @@ import { cn } from '@/lib/utils';
 
 interface FieldProps extends React.HTMLAttributes<HTMLDivElement> {
     showRaster?: boolean;
+    /** The field is shown rotated by 180° (defense view): turn the labels back so they stay readable */
+    flipped?: boolean;
 }
 
 export const FIELD_WIDTH_YARDS = 25; // Standard width
 export const TOTAL_LENGTH_YARDS = 25; // Compact field: 5yd backfield + 20yd play area
 export const YARD_TO_PX = 25; // Larger scale since field is smaller dimensions
 
-export const Field: React.FC<FieldProps> = ({ className, children, showRaster, ...props }) => {
+export const Field: React.FC<FieldProps> = ({ className, children, showRaster, flipped, ...props }) => {
     const widthPx = FIELD_WIDTH_YARDS * YARD_TO_PX;
     const heightPx = TOTAL_LENGTH_YARDS * YARD_TO_PX;
 
@@ -26,6 +28,10 @@ export const Field: React.FC<FieldProps> = ({ className, children, showRaster, .
         const yardsFromTop = TOTAL_LENGTH_YARDS - fieldYardsFromBottom;
         return yardsFromTop * YARD_TO_PX;
     };
+
+    const labelStyle: React.CSSProperties | undefined = flipped
+        ? { transform: 'rotate(180deg)', transformBox: 'fill-box', transformOrigin: 'center' }
+        : undefined;
 
     return (
         <div
@@ -48,7 +54,7 @@ export const Field: React.FC<FieldProps> = ({ className, children, showRaster, .
                 {/* Line of Scrimmage (LOS) - Blue Line */}
                 <line x1="0" y1={getLineY(0)} x2="100%" y2={getLineY(0)} stroke="#2563eb" strokeWidth="3" />
                 {/* Label for LOS? */}
-                <text x="5" y={getLineY(0) - 5} fill="#2563eb" fontSize="12" fontWeight="bold">LOS</text>
+                <text x="5" y={getLineY(0) - 5} fill="#2563eb" fontSize="12" fontWeight="bold" style={labelStyle}>LOS</text>
 
                 {/* 10 Yard Line (Full Gray Line) */}
                 <line x1="0" y1={getLineY(10)} x2="100%" y2={getLineY(10)} stroke="gray" strokeWidth="2" />
@@ -63,7 +69,7 @@ export const Field: React.FC<FieldProps> = ({ className, children, showRaster, .
 
                 {/* Yard numbers (left side, just above each line) */}
                 {[10, 7, 5].map(yards => (
-                    <text key={`yard-${yards}`} x="3" y={getLineY(yards) - 4} fill="#0f172a" fontSize="10" fontFamily="sans-serif">
+                    <text key={`yard-${yards}`} x="3" y={getLineY(yards) - 4} fill="#0f172a" fontSize="10" fontFamily="sans-serif" style={labelStyle}>
                         {yards}
                     </text>
                 ))}

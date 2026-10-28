@@ -5,11 +5,15 @@ import { PlaybookGrid } from '@/components/PlaybookGrid'
 import { PlayerToken } from '@/components/PlayerToken'
 import { RoutePath } from '@/components/RoutePath'
 import { RouteControls } from '@/components/RouteControls'
+import { DefenseControls } from '@/components/DefenseControls'
+import { DefenseLayer } from '@/components/DefenseLayer'
+import { DefenderToken } from '@/components/DefenderToken'
 import { PrintModal, type PrintSettings } from '@/components/PrintModal'
 import { PrintView } from '@/components/PrintView'
-import type { Point, RouteType, RouteSegment } from '@/types'
+import type { Point, RouteType, RouteSegment, Coverage, Defender } from '@/types'
 import { usePlaybook } from '@/hooks/usePlaybook'
 import { S, clampPoint } from '@/lib/constants'
+import { applyCoverage, completeDefense, defenderColor, DEFENDER_COUNT, NEUTRAL_OFFENSE_COLOR } from '@/lib/defense'
 import { cn } from '@/lib/utils'
 import {
   minifyPlaybook,
@@ -21,9 +25,10 @@ import {
   fromBase64URL
 } from '@/lib/shareUtils'
 import { Capacitor } from '@capacitor/core'
+import { ImageDown, Shield } from 'lucide-react'
 import { App as NativeApp } from '@capacitor/app'
-import { Share } from '@capacitor/share'
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
+import { shareFile } from '@/lib/shareFile'
+import { renderPlayImage } from '@/lib/playImage'
 
 const FIELD_PX = 625;
 // Padding around the field column in the center pane on desktop (md:p-8)
@@ -59,6 +64,7 @@ function App() {
     handleUpdatePlayTags,
     handleUpdatePlayer,
     handleMovePlayerLayer,
+    handleUpdateDefense,
     handleSetPosition,
     handleFormation,
     handleApplyRoute,
@@ -114,6 +120,19 @@ function App() {
   } | null>(null);
   const [draggedPlayer, setDraggedPlayer] = useState<string | null>(null);
   const wasDraggingRef = useRef(false);
+
+  // Defense view: field turned by 180°, defenders editable instead of the offense
+  const [isDefenseView, setIsDefenseView] = useState(false);
+  const [selectedDefenderId, setSelectedDefenderId] = useState<string | null>(null);
+  const [draggedDefender, setDraggedDefender] = useState<string | null>(null);
+  // Zone handles of the selected defender: move the zone or change its size
+  const [draggedZoneHandle, setDraggedZoneHandle] = useState<'move' | 'size' | null>(null);
+  // While moving a zone: zone center minus the grab point, so the zone doesn't jump to the pointer
+  const zoneGrabOffsetRef = useRef<Point | null>(null);
+  // Drawing an arrow for the selected defender (null when not drawing)
+  const [defenderArrowPoints, setDefenderArrowPoints] = useState<Point[] | null>(null);
+  // Index of the selected defender's arrow point being dragged
+  const [draggedArrowPoint, setDraggedArrowPoint] = useState<number | null>(null);
   // Set when a press starts on a route handle; the click that follows may land on the field
   // (the handle is replaced by a new point under the cursor) and must not deselect the player
   const pressedHandleRef = useRef(false);
@@ -126,6 +145,14 @@ function App() {
       x: Math.round(p.x / snap) * snap,
       y: Math.round(p.y / snap) * snap
     };
+  };
+
+  /** Screen position → field coordinates, taking the scale and the defense view's 180° turn into account */
+  const toFieldPoint = (clientX: number, clientY: number, fieldEl: Element): Point => {
+    const rect = fieldEl.getBoundingClientRect();
+    const x = (clientX - rect.left) / fieldScale;
+    const y = (clientY - rect.top) / fieldScale;
+    return isDefenseView ? { x: FIELD_PX - x, y: FIELD_PX - y } : { x, y };
   };
 
   // Print state
@@ -220,11 +247,11 @@ function App() {
     const el = fieldContainerRef.current;
     if (!el) return;
     const preventScroll = (e: TouchEvent) => {
-      if (isDrawing || draggedPlayer || draggedPoint) e.preventDefault();
+      if (isDrawing || draggedPlayer || draggedPoint || draggedDefender || draggedZoneHandle || draggedArrowPoint !== null) e.preventDefault();
     };
     el.addEventListener('touchmove', preventScroll, { passive: false });
     return () => el.removeEventListener('touchmove', preventScroll);
-  }, [isDrawing, draggedPlayer, draggedPoint]);
+  }, [isDrawing, draggedPlayer, draggedPoint, draggedDefender, draggedZoneHandle, draggedArrowPoint]);
 
   const startDrawing = () => {
     if (!selectedPlayer) return;
@@ -271,13 +298,17 @@ function App() {
       pressedHandleRef.current = false;
       return;
     }
-    if (!isDrawing) {
-      if (selectedPlayerId) setSelectedPlayerId(null);
+    if (defenderArrowPoints) {
+      const point = clampPoint(snapToGrid(toFieldPoint(e.clientX, e.clientY, e.currentTarget)));
+      setDefenderArrowPoints([...defenderArrowPoints, point]);
       return;
     }
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / fieldScale;
-    const y = (e.clientY - rect.top) / fieldScale;
+    if (!isDrawing) {
+      if (selectedPlayerId) setSelectedPlayerId(null);
+      if (selectedDefenderId) setSelectedDefenderId(null);
+      return;
+    }
+    const { x, y } = toFieldPoint(e.clientX, e.clientY, e.currentTarget);
 
     // Snap to 0.5 yards (S is pixels per yard)
     const snap = S / 2;
@@ -285,6 +316,17 @@ function App() {
     const snappedY = Math.round(y / snap) * snap;
 
     addToRoute({ x: snappedX, y: snappedY });
+  };
+
+  const handleExportPlayImage = async () => {
+    if (!currentPlay) return;
+    try {
+      const file = await renderPlayImage(currentPlay, { showDefense: isDefenseView });
+      await shareFile(file, { title: `Play: ${currentPlay.name}`, text: currentPlay.name });
+    } catch (e) {
+      console.error("Image export failed", e);
+      alert("Failed to create the play image.");
+    }
   };
 
   const handleExportPlaybook = async () => {
@@ -308,49 +350,12 @@ function App() {
         type: 'text/html'
       });
 
-      // 4a. Native app: write the file to the cache and open the system share sheet
-      if (Capacitor.isNativePlatform()) {
-        const { uri } = await Filesystem.writeFile({
-          path: file.name.replace(/[^\w.-]/g, '_'),
-          data: htmlContent,
-          directory: Directory.Cache,
-          encoding: Encoding.UTF8,
-        });
-        try {
-          await Share.share({
-            title: `Playbook: ${currentPlaybook.name}`,
-            text: `Open the attached file to view the playbook: ${currentPlaybook.name}`,
-            files: [uri],
-            dialogTitle: 'Share playbook',
-          });
-        } catch {
-          // Share sheet dismissed
-        }
-        return;
-      }
-
-      // 4b. Share File
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            files: [file],
-            title: `Playbook: ${currentPlaybook.name}`,
-            text: `Open the attached file to view the playbook: ${currentPlaybook.name}`
-          });
-          return;
-        } catch (e) {
-          // Fallback to download if share is cancelled or fails
-        }
-      }
-
-      // 5. Fallback: Direct Download
-      const url = URL.createObjectURL(file);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name;
-      a.click();
-      URL.revokeObjectURL(url);
-      alert("File downloaded! Share this file with your coach/players.");
+      // 4. Share the file, or download it where sharing isn't available
+      const result = await shareFile(file, {
+        title: `Playbook: ${currentPlaybook.name}`,
+        text: `Open the attached file to view the playbook: ${currentPlaybook.name}`,
+      });
+      if (result === 'downloaded') alert("File downloaded! Share this file with your coach/players.");
     } catch (e) {
       console.error("Export failed", e);
       alert("Failed to generate sharing file.");
@@ -360,8 +365,10 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && isDrawing) finishDrawing();
+      if (e.key === 'Enter' && defenderArrowPoints) finishDefenderArrow();
       if (e.key === 'Escape') {
         if (isDrawing) cancelDrawing();
+        else if (defenderArrowPoints) setDefenderArrowPoints(null);
         else setSelectedPlayerId(null);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
@@ -404,7 +411,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDrawing, activeRoutePoints, setSelectedPlayerId, undo, redo, plays, folders, currentPlayId, setCurrentPlayId]);
+  }, [isDrawing, activeRoutePoints, defenderArrowPoints, selectedDefenderId, setSelectedPlayerId, undo, redo, plays, folders, currentPlayId, setCurrentPlayId]);
 
   // Handle shareable links and handshakes on mount
   useEffect(() => {
@@ -508,15 +515,52 @@ function App() {
     };
   }, [handleImportData]);
 
+  // Drag a defender, or the selected defender's zone, to a (snapped) field point
+  const dragDefenseTo = (point: Point) => {
+    if (!currentPlay?.defense) return;
+    const defenders = currentPlay.defense.defenders.map(d => {
+      if (draggedDefender === d.id) {
+        // The arrow moves along with the defender
+        const position = clampPoint(point);
+        const dx = position.x - d.position.x;
+        const dy = position.y - d.position.y;
+        return { ...d, position, path: d.path?.map(p => clampPoint({ x: p.x + dx, y: p.y + dy })) };
+      }
+      if (draggedArrowPoint !== null && selectedDefenderId === d.id && d.path) {
+        return { ...d, path: d.path.map((p, i) => i === draggedArrowPoint ? clampPoint(point) : p), pathFromCoverage: false };
+      }
+      if (draggedZoneHandle && selectedDefenderId === d.id && d.zone) {
+        return {
+          ...d,
+          zone: draggedZoneHandle === 'move'
+            ? (() => {
+              const offset = zoneGrabOffsetRef.current ?? { x: 0, y: 0 };
+              return { ...d.zone, dx: point.x + offset.x - d.position.x, dy: point.y + offset.y - d.position.y };
+            })()
+            : {
+              ...d.zone,
+              rx: Math.max(S, Math.abs(point.x - (d.position.x + d.zone.dx))),
+              ry: Math.max(S, Math.abs(point.y - (d.position.y + d.zone.dy))),
+            },
+        };
+      }
+      return d;
+    });
+    handleUpdateDefense({ ...currentPlay.defense, defenders });
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!draggedPoint && !draggedPlayer) return;
+    if (!draggedPoint && !draggedPlayer && !draggedDefender && !draggedZoneHandle && draggedArrowPoint === null) return;
     if (!currentPlay) return;
 
+    const snapped = snapToGrid(toFieldPoint(e.clientX, e.clientY, e.currentTarget));
+
+    // Defender / zone drags end on the dragged element itself, so no field click needs swallowing
+    if (draggedDefender || draggedZoneHandle || draggedArrowPoint !== null) {
+      dragDefenseTo(snapped);
+      return;
+    }
     wasDraggingRef.current = true;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / fieldScale;
-    const y = (e.clientY - rect.top) / fieldScale;
-    const snapped = snapToGrid({ x, y });
 
     if (draggedPoint) {
       const updatedPlayers = currentPlay.players.map(p => {
@@ -538,15 +582,17 @@ function App() {
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!draggedPoint && !draggedPlayer) return;
+    if (!draggedPoint && !draggedPlayer && !draggedDefender && !draggedZoneHandle && draggedArrowPoint === null) return;
     if (!currentPlay) return;
 
-    wasDraggingRef.current = true;
     const touch = e.touches[0];
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (touch.clientX - rect.left) / fieldScale;
-    const y = (touch.clientY - rect.top) / fieldScale;
-    const snapped = snapToGrid({ x, y });
+    const snapped = snapToGrid(toFieldPoint(touch.clientX, touch.clientY, e.currentTarget));
+
+    if (draggedDefender || draggedZoneHandle || draggedArrowPoint !== null) {
+      dragDefenseTo(snapped);
+      return;
+    }
+    wasDraggingRef.current = true;
 
     if (draggedPoint) {
       const updatedPlayers = currentPlay.players.map(p => {
@@ -603,9 +649,61 @@ function App() {
     updateCurrentPlay({ ...currentPlay, players: updatedPlayers });
   };
 
+  // ============================================
+  // DEFENSE
+  // ============================================
+
+  const toggleDefenseView = () => {
+    cancelDrawing();
+    setDefenderArrowPoints(null);
+    setSelectedPlayerId(null);
+    setSelectedDefenderId(null);
+    setIsDefenseView(v => !v);
+  };
+
+  // A defender selected in one play means nothing in another
+  useEffect(() => { setSelectedDefenderId(null); setDefenderArrowPoints(null); }, [currentPlayId]);
+
+  const updateDefenders = (update: (defenders: Defender[]) => Defender[]) => {
+    if (!currentPlay) return;
+    pushToUndoStack();
+    const defense = currentPlay.defense ?? { coverage: null, defenders: [] };
+    handleUpdateDefense({ ...defense, defenders: update(defense.defenders) });
+  };
+
+  // The defense view always shows all five defenders: add them when the play doesn't have them yet
+  useEffect(() => {
+    if (!isDefenseView || !currentPlay) return;
+    if ((currentPlay.defense?.defenders.length ?? 0) >= DEFENDER_COUNT) return;
+    handleUpdateDefense(completeDefense(currentPlay, currentPlay.defense));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDefenseView, currentPlay?.id, currentPlay?.defense?.defenders.length]);
+
+  const selectCoverage = (coverage: Coverage) => {
+    if (!currentPlay) return;
+    pushToUndoStack();
+    handleUpdateDefense(applyCoverage(currentPlay, completeDefense(currentPlay, currentPlay.defense), coverage));
+  };
+
+  const updateDefender = (id: string, updates: Partial<Defender>) =>
+    updateDefenders(defenders => defenders.map(d => d.id === id ? { ...d, ...updates } : d));
+
+  const startDefenderArrow = () => setDefenderArrowPoints([]);
+
+  const finishDefenderArrow = () => {
+    if (selectedDefenderId && defenderArrowPoints?.length) {
+      updateDefender(selectedDefenderId, { path: defenderArrowPoints, pathFromCoverage: false });
+    }
+    setDefenderArrowPoints(null);
+  };
+
+
   const handleMouseUp = () => {
     setDraggedPoint(null);
     setDraggedPlayer(null);
+    setDraggedDefender(null);
+    setDraggedZoneHandle(null);
+    setDraggedArrowPoint(null);
     if (dragTimerRef.current) {
       clearTimeout(dragTimerRef.current);
       dragTimerRef.current = null;
@@ -682,8 +780,38 @@ function App() {
                 className="relative"
                 style={{ width: 625 * fieldScale, height: 625 * fieldScale }}
               >
+                {/* Defense view toggle: left of the field, inside its corner on phones */}
+                {currentPlay && (
+                  <button
+                    onClick={toggleDefenseView}
+                    className={cn(
+                      "absolute z-30 top-1 left-1 md:top-0 md:left-auto md:right-full md:mr-2 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg border transition-colors",
+                      isDefenseView
+                        ? "bg-red-700 border-red-500 text-white"
+                        : "bg-slate-800/90 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-red-400"
+                    )}
+                    title={isDefenseView ? 'Back to the offense view' : 'Defense view: see the play from the defense and set up a coverage'}
+                  >
+                    <Shield size={18} />
+                    <span className="text-[10px] font-semibold">DEF</span>
+                  </button>
+                )}
+
+                {/* Share the play as an image: right of the field, inside its corner on phones */}
+                {currentPlay && (
+                  <button
+                    onClick={handleExportPlayImage}
+                    className="absolute z-30 top-1 right-1 md:top-0 md:right-auto md:left-full md:ml-2 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-emerald-400 transition-colors"
+                    title="Share this play as an image (PNG)"
+                  >
+                    <ImageDown size={18} />
+                    <span className="text-[10px] font-semibold">PNG</span>
+                  </button>
+                )}
                 <div style={{ transform: `scale(${fieldScale})`, transformOrigin: 'top left', width: 625, height: 625 }}>
+                <div style={{ transform: isDefenseView ? 'rotate(180deg)' : undefined, width: 625, height: 625 }}>
                 <Field
+                  flipped={isDefenseView}
                   onClick={handleFieldClick}
                   onMouseDown={() => { pressedHandleRef.current = false; }}
                   onMouseMove={handleMouseMove}
@@ -691,11 +819,21 @@ function App() {
                   onMouseLeave={handleMouseUp}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleMouseUp}
-                  className={isDrawing ? 'cursor-crosshair' : isSettingMotion ? 'cursor-alias' : 'cursor-default'}
-                  showRaster={isDrawing || isSettingMotion || !!draggedPoint || !!draggedPlayer}
+                  className={isDrawing || defenderArrowPoints ? 'cursor-crosshair' : isSettingMotion ? 'cursor-alias' : 'cursor-default'}
+                  showRaster={isDrawing || isSettingMotion || !!draggedPoint || !!draggedPlayer || !!defenderArrowPoints || !!draggedDefender || !!draggedZoneHandle || draggedArrowPoint !== null}
                 >
                   {/* Render Routes */}
                   <svg className="absolute inset-0 pointer-events-none z-0" width="100%" height="100%">
+                    {/* Defense (zones, man lines, rush) under the offense's routes */}
+                    {isDefenseView && currentPlay?.defense && (
+                      <DefenseLayer
+                        play={currentPlay}
+                        defense={currentPlay.defense}
+                        toCanvas={p => p}
+                        yard={S}
+                        selectedDefenderId={selectedDefenderId}
+                      />
+                    )}
                     {/* ... (Motion and Routes rendering) */}
                     {currentPlay?.players.map(player => {
                       if (!player.motion) return null;
@@ -711,7 +849,7 @@ function App() {
                         <polyline
                           key={`motion-${player.id}`}
                           points={points}
-                          stroke={player.color}
+                          stroke={isDefenseView ? NEUTRAL_OFFENSE_COLOR : player.color}
                           strokeWidth={4}
                           strokeOpacity={0.5}
                           fill="none"
@@ -726,9 +864,9 @@ function App() {
                         <RoutePath
                           key={route.id}
                           segment={route}
-                          color={player.color}
+                          color={isDefenseView ? NEUTRAL_OFFENSE_COLOR : player.color}
                           isSelected={selectedPlayerId === player.id}
-                          onSelect={isDrawing || isSettingMotion ? undefined : () => {
+                          onSelect={isDrawing || isSettingMotion || isDefenseView ? undefined : () => {
                             setSelectedPlayerId(player.id);
                             setActiveRouteType(route.type);
                           }}
@@ -740,15 +878,26 @@ function App() {
                         <RoutePath
                           key={route.id}
                           segment={route}
-                          color={player.color}
+                          color={isDefenseView ? NEUTRAL_OFFENSE_COLOR : player.color}
                           isSelected={selectedPlayerId === player.id}
-                          onSelect={isDrawing || isSettingMotion ? undefined : () => {
+                          onSelect={isDrawing || isSettingMotion || isDefenseView ? undefined : () => {
                             setSelectedPlayerId(player.id);
                             setActiveRouteType(route.type);
                           }}
                         />
                       ))
                     ))}
+                    {defenderArrowPoints && (() => {
+                      const index = currentPlay?.defense?.defenders.findIndex(d => d.id === selectedDefenderId) ?? -1;
+                      const defender = index >= 0 ? currentPlay!.defense!.defenders[index] : null;
+                      if (!defender || defenderArrowPoints.length === 0) return null;
+                      return (
+                        <RoutePath
+                          segment={{ id: 'defender-arrow', type: 'primary', points: [defender.position, ...defenderArrowPoints] }}
+                          color={defenderColor(defender, index)}
+                        />
+                      );
+                    })()}
                     {isDrawing && activeRoutePoints.length > 0 && (
                       <RoutePath
                         segment={{ id: 'drawing', type: drawingType, points: activeRoutePoints }}
@@ -876,10 +1025,21 @@ function App() {
                   {currentPlay?.players.map(player => (
                     <PlayerToken
                       key={player.id}
-                      player={player}
+                      player={isDefenseView ? { ...player, color: NEUTRAL_OFFENSE_COLOR } : player}
                       isSelected={selectedPlayerId === player.id}
                       isDragging={draggedPlayer === player.id}
+                      flipped={isDefenseView}
                       onSelect={(id) => {
+                        if (isDefenseView) {
+                          // Tap a receiver: the selected defender covers him man to man (tap again to undo)
+                          const defender = currentPlay?.defense?.defenders.find(d => d.id === selectedDefenderId);
+                          if (defender && player.role !== 'QB') {
+                            updateDefender(defender.id, {
+                              manTargetId: defender.manTargetId === id ? null : id, rush: false, zone: null,
+                            });
+                          }
+                          return;
+                        }
                         if (isSettingMotion) {
                           handleMotionSet(id);
                         } else if (!isDrawing) {
@@ -887,7 +1047,7 @@ function App() {
                         }
                       }}
                       onDragStart={(id) => {
-                        if (!isDrawing && !isSettingMotion) {
+                        if (!isDrawing && !isSettingMotion && !isDefenseView) {
                           dragTimerRef.current = setTimeout(() => {
                             pushToUndoStack();
                             setDraggedPlayer(id);
@@ -897,27 +1057,122 @@ function App() {
                       }}
                     />
                   ))}
+
+                  {/* Defense view: draggable defenders and the selected defender's zone handles */}
+                  {isDefenseView && currentPlay?.defense?.defenders.map((defender, index) => (
+                    <DefenderToken
+                      key={defender.id}
+                      defender={defender}
+                      color={defenderColor(defender, index)}
+                      isSelected={selectedDefenderId === defender.id}
+                      onPress={(id) => {
+                        if (defenderArrowPoints) return;
+                        pushToUndoStack();
+                        setSelectedDefenderId(id);
+                        setDraggedDefender(id);
+                      }}
+                    />
+                  ))}
+                  {isDefenseView && (() => {
+                    const index = currentPlay?.defense?.defenders.findIndex(d => d.id === selectedDefenderId) ?? -1;
+                    const defender = index >= 0 ? currentPlay!.defense!.defenders[index] : null;
+                    if (!defender?.zone || defenderArrowPoints) return null;
+                    const center = { x: defender.position.x + defender.zone.dx, y: defender.position.y + defender.zone.dy };
+                    const corner = { x: center.x + defender.zone.rx, y: center.y - defender.zone.ry };
+                    const color = defenderColor(defender, index);
+                    const startHandleDrag = (handle: 'move' | 'size') => (e: React.MouseEvent | React.TouchEvent) => {
+                      e.stopPropagation();
+                      pushToUndoStack();
+                      const { clientX, clientY } = 'touches' in e ? e.touches[0] : e;
+                      const grab = snapToGrid(toFieldPoint(clientX, clientY, fieldContainerRef.current!));
+                      zoneGrabOffsetRef.current = { x: center.x - grab.x, y: center.y - grab.y };
+                      setDraggedZoneHandle(handle);
+                    };
+                    // Under the defender tokens (z-20), so grabbing the X still moves the defender
+                    return (
+                      <svg className="absolute inset-0 pointer-events-none z-10" width="100%" height="100%">
+                        <ellipse
+                          cx={center.x} cy={center.y} rx={defender.zone.rx} ry={defender.zone.ry}
+                          fill="transparent"
+                          className="pointer-events-auto cursor-move"
+                          onMouseDown={startHandleDrag('move')}
+                          onTouchStart={startHandleDrag('move')}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <title>Drag to move the zone</title>
+                        </ellipse>
+                        <rect
+                          x={corner.x - 7} y={corner.y - 7} width={14} height={14} rx={3}
+                          fill="white" stroke={color} strokeWidth={2.5}
+                          className="pointer-events-auto cursor-nesw-resize"
+                          onMouseDown={startHandleDrag('size')}
+                          onTouchStart={startHandleDrag('size')}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <title>Drag to resize the zone</title>
+                        </rect>
+                      </svg>
+                    );
+                  })()}
+                  {/* Selected defender's arrow: drag its points (the last one is the tip) */}
+                  {isDefenseView && !defenderArrowPoints && (() => {
+                    const index = currentPlay?.defense?.defenders.findIndex(d => d.id === selectedDefenderId) ?? -1;
+                    const defender = index >= 0 ? currentPlay!.defense!.defenders[index] : null;
+                    if (!defender?.path?.length) return null;
+                    const color = defenderColor(defender, index);
+                    return (
+                      <svg className="absolute inset-0 pointer-events-none z-20" width="100%" height="100%">
+                        {defender.path.map((point, i) => (
+                          <circle
+                            key={i}
+                            cx={point.x} cy={point.y} r={7}
+                            fill="white" stroke={color} strokeWidth={2.5}
+                            className="pointer-events-auto cursor-move"
+                            onMouseDown={(e) => { e.stopPropagation(); pushToUndoStack(); setDraggedArrowPoint(i); }}
+                            onTouchStart={(e) => { e.stopPropagation(); pushToUndoStack(); setDraggedArrowPoint(i); }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <title>{i === defender.path!.length - 1 ? 'Drag to move the arrow tip' : 'Drag to move this point'}</title>
+                          </circle>
+                        ))}
+                      </svg>
+                    );
+                  })()}
                 </Field>
+                </div>
                 </div>
               </div>
 
-              {/* Route controls for the selected player, below the field */}
-              <RouteControls
-                className="w-full max-w-[880px] big:max-w-[1000px]"
-                style={{ minWidth: FIELD_PX * fieldScale }}
-                selectedPlayer={selectedPlayer}
-                activeRouteType={activeRouteType}
-                onSetActiveRouteType={setActiveRouteType}
-                onApplyRoute={(preset) => handleApplyRoute(preset, activeRouteType)}
-                onStartDrawing={startDrawing}
-                onFinishDrawing={finishDrawing}
-                onClearRoutes={clearRoutes}
-                isDrawing={isDrawing}
-                savedRoutes={savedRoutes}
-                onSaveRoute={handleSaveRoute}
-                onDeleteSavedRoute={handleDeleteSavedRoute}
-                onApplySavedRoute={(id, type) => handleApplySavedRoute(id, type)}
-              />
+              {/* Below the field: defense controls in the defense view, otherwise the route controls.
+                  Both stay rendered in the same grid cell, so switching views doesn't change the height */}
+              <div className="w-full max-w-[880px] big:max-w-[1000px] grid" style={{ minWidth: FIELD_PX * fieldScale }}>
+                <DefenseControls
+                  className={cn("[grid-area:1/1]", !isDefenseView && "invisible")}
+                  play={currentPlay}
+                  defense={currentPlay?.defense ?? null}
+                  selectedDefenderId={selectedDefenderId}
+                  onApplyCoverage={selectCoverage}
+                  onUpdateDefender={updateDefender}
+                  isDrawingArrow={!!defenderArrowPoints}
+                  onStartArrow={startDefenderArrow}
+                  onFinishArrow={finishDefenderArrow}
+                />
+                <RouteControls
+                  className={cn("[grid-area:1/1]", isDefenseView && "invisible")}
+                  selectedPlayer={selectedPlayer}
+                  activeRouteType={activeRouteType}
+                  onSetActiveRouteType={setActiveRouteType}
+                  onApplyRoute={(preset) => handleApplyRoute(preset, activeRouteType)}
+                  onStartDrawing={startDrawing}
+                  onFinishDrawing={finishDrawing}
+                  onClearRoutes={clearRoutes}
+                  isDrawing={isDrawing}
+                  savedRoutes={savedRoutes}
+                  onSaveRoute={handleSaveRoute}
+                  onDeleteSavedRoute={handleDeleteSavedRoute}
+                  onApplySavedRoute={(id, type) => handleApplySavedRoute(id, type)}
+                />
+              </div>
             </div>
 
           </div>
