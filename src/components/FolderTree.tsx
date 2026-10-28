@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChevronRight, ChevronDown, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Play, PlayFolder } from '@/types';
@@ -57,6 +57,7 @@ const PlayRow: React.FC<PlayRowProps> = ({
 );
 
 // Height of one folder header row in px — must match the rendered height of the header div.
+// While scrolling, the formation header sticks at the top and the depth header right below it.
 const FOLDER_HEADER_H = 26;
 
 export const FolderTree: React.FC<FolderTreeProps> = ({
@@ -69,11 +70,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
 }) => {
     const [draggedPlayId, setDraggedPlayId] = useState<string | null>(null);
 
-    // Scroll-based sticky tracking
     const scrollRef = useRef<HTMLDivElement>(null);
-    const sentinelRefs = useRef<Record<string, HTMLDivElement | null>>({});
-    // IDs of top-level folders whose headers have scrolled past the top, in scroll order
-    const [stuckFolderIds, setStuckFolderIds] = useState<string[]>([]);
 
     // Scroll the selected play row into view when currentPlayId changes externally
     useEffect(() => {
@@ -81,28 +78,6 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
         const el = scrollRef.current.querySelector<HTMLElement>(`[data-play-id="${currentPlayId}"]`);
         el?.scrollIntoView({ block: 'nearest' });
     }, [currentPlayId]);
-
-    const handleScroll = useCallback(() => {
-        const container = scrollRef.current;
-        if (!container) return;
-        const containerTop = container.getBoundingClientRect().top;
-
-        const stuck: Array<{ id: string; naturalTop: number }> = [];
-        for (const [id, sentinel] of Object.entries(sentinelRefs.current)) {
-            if (!sentinel) continue;
-            const sentinelTop = sentinel.getBoundingClientRect().top;
-            if (sentinelTop < containerTop) {
-                // naturalTop: sentinel's position in scroll-space (stable for sorting)
-                const naturalTop = sentinelTop - containerTop + container.scrollTop;
-                stuck.push({ id, naturalTop });
-            }
-        }
-        stuck.sort((a, b) => a.naturalTop - b.naturalTop);
-        const newIds = stuck.map(s => s.id);
-        setStuckFolderIds(prev =>
-            prev.length === newIds.length && prev.every((id, i) => id === newIds[i]) ? prev : newIds
-        );
-    }, []);
 
     // Folders follow the routes, so plays can only be reordered, not moved between folders
     const handleDropOnPlay = (e: React.DragEvent, targetId: string) => {
@@ -124,22 +99,17 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
     const playCount = (folder: PlayFolder) =>
         playsInFolder(folder.id).length + subFolders(folder.id).reduce((sum, sub) => sum + playsInFolder(sub.id).length, 0);
 
-    // Stack index → pixel offset for a folder that has scrolled past the top
-    const stickyTop = (folderId: string): number => {
-        const idx = stuckFolderIds.indexOf(folderId);
-        return idx === -1 ? 0 : idx * FOLDER_HEADER_H;
-    };
-
-    const renderFolderHeader = (folder: PlayFolder, isSubFolder: boolean, topPx?: number) => (
+    const renderFolderHeader = (folder: PlayFolder, isSubFolder: boolean) => (
         <div
             key={folder.id}
             className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-slate-800/50 cursor-pointer select-none",
-                isSubFolder ? "bg-slate-900/90" : "sticky z-10 bg-slate-900"
+                "flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-slate-800 cursor-pointer select-none sticky bg-slate-900",
+                isSubFolder ? "z-10" : "z-20"
             )}
             style={{
+                height: FOLDER_HEADER_H,
                 paddingLeft: isSubFolder ? '20px' : '8px',
-                top: topPx !== undefined ? `${topPx}px` : undefined,
+                top: isSubFolder ? FOLDER_HEADER_H : 0,
             }}
             onClick={() => onToggleFolder(folder.id)}
         >
@@ -161,7 +131,6 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
     return (
         <div
             ref={scrollRef}
-            onScroll={handleScroll}
             className="max-h-64 overflow-y-auto text-sm scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900"
         >
             {plays.length === 0 && (
@@ -170,11 +139,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
 
             {topFolders.map(folder => (
                 <div key={folder.id}>
-                    {/* Sentinel: zero-height marker at the folder's natural position.
-                        Used by handleScroll to detect when this folder has scrolled past the top. */}
-                    <div ref={el => { sentinelRefs.current[folder.id] = el; }} style={{ height: 0 }} />
-
-                    {renderFolderHeader(folder, false, stickyTop(folder.id))}
+                    {renderFolderHeader(folder, false)}
 
                     {folder.isExpanded && subFolders(folder.id).map(sub => (
                         <div key={sub.id}>
