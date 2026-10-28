@@ -54,10 +54,11 @@ const shapeName = (route: RouteSegment): string => {
 export const generatePlayName = (play: Play): string | null => {
     const names = play.players
         .filter(p => p.role !== 'QB')
-        .map(p => ({ x: p.position.x, route: p.routes.find(r => r.type === 'primary') }))
-        .filter((p): p is { x: number; route: RouteSegment } => !!p.route && p.route.points.length >= 2)
-        .sort((a, b) => a.x - b.x)
-        .map(p => presetName(p.route) ?? shapeName(p.route));
+        .map(p => p.routes.find(r => r.type === 'primary'))
+        .filter((r): r is RouteSegment => !!r && r.points.length >= 2)
+        // Order by where the route starts (after motion), not where the player lines up
+        .sort((a, b) => a.points[0].x - b.points[0].x)
+        .map(r => presetName(r) ?? shapeName(r));
 
     if (names.length === 0) return null;
     if (names.length > 1 && names.every(n => n === names[0])) return `All ${names[0]}`;
