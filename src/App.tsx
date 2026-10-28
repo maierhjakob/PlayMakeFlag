@@ -606,7 +606,7 @@ function App() {
 
         {/* Center - Field */}
         <div ref={centerPaneRef} className={cn("flex-1 flex items-start justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto", mobileTab === 'field' ? 'flex' : 'hidden md:flex')}>
-          <div className="w-full p-4 md:p-8 flex items-start justify-center gap-4">
+          <div className="w-full my-auto p-4 md:p-8 flex items-start justify-center gap-4">
             <div ref={fieldColumnRef} className="w-full flex flex-col items-center gap-2">
               {/* Tags above the field */}
               {currentPlay?.tags && currentPlay.tags.length > 0 && (
