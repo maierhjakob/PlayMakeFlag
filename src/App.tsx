@@ -16,9 +16,12 @@ import {
   unminifyPlaybook,
   isMinified,
   generateRedirectHtml,
+  extractShareData,
   toBase64URL,
   fromBase64URL
 } from '@/lib/shareUtils'
+import { Capacitor } from '@capacitor/core'
+import { App as NativeApp } from '@capacitor/app'
 
 const FIELD_PX = 625;
 // Padding around the field column in the center pane on desktop (md:p-8)
@@ -445,12 +448,36 @@ function App() {
       }
     };
 
+    // Native app: an exported playbook .html file was opened with the app (content:// or file:// URL)
+    const handleOpenedFile = async (url: string | undefined) => {
+      if (!url || !/^(content|file):/.test(url)) return;
+      try {
+        const html = await (await fetch(Capacitor.convertFileSrc(url))).text();
+        const shareData = extractShareData(html);
+        if (!shareData) {
+          alert("This file doesn't contain a playbook.");
+          return;
+        }
+        await processData(shareData);
+      } catch (e) {
+        console.error("Failed to open playbook file", e);
+        alert("The file could not be opened.");
+      }
+    };
+    const urlOpenListener = Capacitor.isNativePlatform()
+      ? NativeApp.addListener('appUrlOpen', ({ url }) => handleOpenedFile(url))
+      : null;
+    if (Capacitor.isNativePlatform()) {
+      NativeApp.getLaunchUrl().then(launch => handleOpenedFile(launch?.url));
+    }
+
     handleInboundShare();
     window.addEventListener('hashchange', handleInboundShare);
     window.addEventListener('popstate', handleInboundShare);
     window.addEventListener('message', handleMessage);
 
     return () => {
+      urlOpenListener?.then(listener => listener.remove());
       if (handshakeInterval) clearInterval(handshakeInterval);
       window.removeEventListener('hashchange', handleInboundShare);
       window.removeEventListener('popstate', handleInboundShare);
@@ -563,7 +590,15 @@ function App() {
   };
 
   return (
-    <div className="h-dvh flex flex-col bg-slate-950">
+    <div
+      className="h-dvh flex flex-col bg-slate-950"
+      // Edge-to-edge (viewport-fit=cover): keep clear of the status bar and display cutouts
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
       <main className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Sidebar */}
         <PlaybookSidebar
@@ -587,7 +622,6 @@ function App() {
           onSetFormation={handleFormation}
           onSetPosition={handleSetPosition}
           onSetMotionMode={() => { setIsSettingMotion(!isSettingMotion); if (!isSettingMotion) setMobileTab('field'); }}
-          onExportPlaybook={handleExportPlaybook}
           onCopyPlay={handleCopyPlay}
           onMirrorPlay={handleMirrorPlay}
           // Motion props
@@ -897,6 +931,7 @@ function App() {
             setMobileTab('field');
           }}
           onOpenPrintSettings={() => setIsPrintModalOpen(true)}
+          onExportPlaybook={handleExportPlaybook}
         />
       </main>
 

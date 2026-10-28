@@ -148,6 +148,10 @@ export const isMinified = (data: any): boolean => {
 };
 
 // HTML Redirector Generator (Handshake Version)
+/** The share data embedded in an exported playbook file (see generateRedirectHtml), or null if it isn't one. */
+export const extractShareData = (html: string): string | null =>
+    html.match(/const PLAYBOOK_DATA = "([^"]+)"/)?.[1] ?? null;
+
 export const generateRedirectHtml = (playbookName: string, shareData: string): string => {
     const appUrl = `https://maierhjakob.github.io/PlayMakeFlag/`;
 

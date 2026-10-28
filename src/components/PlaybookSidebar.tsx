@@ -21,7 +21,6 @@ interface PlaybookSidebarProps {
     onMovePlayerLayer: (id: string, to: 'front' | 'back') => void;
     onSetFormation: (formation: Formation, side: 'left' | 'right') => void;
     onSetPosition: (role: string) => void;
-    onExportPlaybook: () => void;
     onCopyPlay: (id: string) => void;
     onMirrorPlay: (id: string) => void;
     // Motion props
@@ -49,7 +48,6 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     onMovePlayerLayer,
     onSetFormation,
     onSetPosition,
-    onExportPlaybook,
     onCopyPlay,
     onMirrorPlay,
     onClearMotion,
@@ -493,16 +491,6 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                 >
                     <Plus size={18} /> New Play
                 </button>
-
-                <div className="pt-2 border-t border-slate-700/50">
-                    <button
-                        onClick={onExportPlaybook}
-                        className="w-full bg-slate-800/50 hover:bg-slate-800 text-slate-400 py-2 px-4 rounded-md flex items-center justify-center gap-2 text-xs font-medium border border-slate-700/50 transition-all"
-                        title="Export and Share Playbook"
-                    >
-                        Export & Share
-                    </button>
-                </div>
             </div>
         </div >
     );

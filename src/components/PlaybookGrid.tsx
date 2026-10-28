@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Grid3x3, Edit2, X, Plus, Trash2, BookOpen, Printer } from 'lucide-react';
+import { Grid3x3, Edit2, X, Plus, Trash2, BookOpen, Printer, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Play, Playbook } from '@/types';
 import { MiniPlayPreview } from './MiniPlayPreview';
@@ -13,6 +13,7 @@ interface PlaybookGridProps {
     onRenamePlaybook: (id: string, name: string) => void;
     onDeletePlaybook: (id: string) => void;
     onOpenPrintSettings: () => void;
+    onExportPlaybook: () => void;
 
     // Grid management
     plays: Play[];
@@ -48,6 +49,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     onAddColumn,
     onRemoveColumn,
     onOpenPrintSettings,
+    onExportPlaybook,
     className,
     style
 }) => {
@@ -98,13 +100,22 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                     <h2 className="text-xl font-bold flex items-center gap-2 text-emerald-400">
                         <BookOpen size={20} /> Playbooks
                     </h2>
-                    <button
-                        onClick={onOpenPrintSettings}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded-lg shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2 text-sm font-bold"
-                        title="Print Playbook"
-                    >
-                        <Printer size={16} /> Print
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={onExportPlaybook}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg border border-slate-700 transition-all flex items-center gap-2 text-sm font-bold"
+                            title="Export and Share Playbook"
+                        >
+                            <Share2 size={16} /> Export & Share
+                        </button>
+                        <button
+                            onClick={onOpenPrintSettings}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded-lg shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2 text-sm font-bold"
+                            title="Print Playbook"
+                        >
+                            <Printer size={16} /> Print
+                        </button>
+                    </div>
                 </div>
 
                 {/* Playbook Selector */}
