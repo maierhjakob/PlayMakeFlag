@@ -105,6 +105,9 @@ function App() {
   } | null>(null);
   const [draggedPlayer, setDraggedPlayer] = useState<string | null>(null);
   const wasDraggingRef = useRef(false);
+  // Set when a press starts on a route handle; the click that follows may land on the field
+  // (the handle is replaced by a new point under the cursor) and must not deselect the player
+  const pressedHandleRef = useRef(false);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastHandledHashRef = useRef<string | null>(null);
 
@@ -228,8 +231,9 @@ function App() {
   };
 
   const handleFieldClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (wasDraggingRef.current) {
+    if (wasDraggingRef.current || pressedHandleRef.current) {
       wasDraggingRef.current = false;
+      pressedHandleRef.current = false;
       return;
     }
     if (!isDrawing) {
@@ -610,6 +614,7 @@ function App() {
                 <div style={{ transform: `scale(${fieldScale})`, transformOrigin: 'top left', width: 625, height: 625 }}>
                 <Field
                   onClick={handleFieldClick}
+                  onMouseDown={() => { pressedHandleRef.current = false; }}
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
                   onMouseLeave={handleMouseUp}
@@ -683,7 +688,13 @@ function App() {
                   </svg>
 
                   {selectedPlayer && !isDrawing && (
-                    <svg className="absolute inset-0 pointer-events-none z-20" width="100%" height="100%">
+                    <svg
+                      className="absolute inset-0 pointer-events-none z-20"
+                      width="100%"
+                      height="100%"
+                      onMouseDownCapture={() => { pressedHandleRef.current = true; }}
+                      onTouchStartCapture={() => { pressedHandleRef.current = true; }}
+                    >
                       {/* Segment midpoints: drag to split a line into two */}
                       {selectedPlayer.routes.map(route => (
                         route.points.slice(1).map((point, idx) => {
