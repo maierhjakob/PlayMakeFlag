@@ -608,20 +608,18 @@ function App() {
         <div ref={centerPaneRef} className={cn("flex-1 flex items-start justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto", mobileTab === 'field' ? 'flex' : 'hidden md:flex')}>
           <div className="w-full my-auto p-4 md:p-8 flex items-start justify-center gap-4">
             <div ref={fieldColumnRef} className="w-full flex flex-col items-center gap-2">
-              {/* Tags above the field */}
-              {currentPlay?.tags && currentPlay.tags.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap justify-center w-full">
-                  {currentPlay.tags.map(tag => (
-                    <div
-                      key={tag.id}
-                      className="px-3 py-1 rounded-full text-sm font-black text-white shadow-lg"
-                      style={{ backgroundColor: tag.color }}
-                    >
-                      {tag.text}
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Tags above the field: always the same height (one line), so the field doesn't jump */}
+              <div className="h-8 flex items-center gap-2 justify-center w-full overflow-hidden shrink-0">
+                {currentPlay?.tags?.map(tag => (
+                  <div
+                    key={tag.id}
+                    className="px-3 py-1 rounded-full text-sm font-black text-white shadow-lg whitespace-nowrap shrink-0"
+                    style={{ backgroundColor: tag.color }}
+                  >
+                    {tag.text}
+                  </div>
+                ))}
+              </div>
               <div
                 ref={fieldContainerRef}
                 className="relative"

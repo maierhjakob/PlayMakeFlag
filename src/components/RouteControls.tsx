@@ -55,7 +55,7 @@ export const RouteControls: React.FC<RouteControlsProps> = ({
         </button>
     );
 
-    // Without a selected player the controls stay visible (disabled), so the layout doesn't jump
+    // Without a selected player the controls stay visible (disabled) with the same height, so the layout doesn't jump
     return (
         <div
             style={style}
@@ -67,18 +67,12 @@ export const RouteControls: React.FC<RouteControlsProps> = ({
         >
             {/* Route layer + drawing */}
             <div className="flex gap-1.5 big:gap-2">
-                {selectedPlayer ? (
-                    <div className="flex-1 flex bg-slate-950/50 rounded p-0.5 border border-slate-700">
-                        {routeTypeButton('primary', 'Primary (Solid)', 'bg-blue-600')}
-                        {routeTypeButton('option', 'Option', 'bg-amber-600')}
-                        {routeTypeButton('check', 'Check', 'bg-slate-700')}
-                        {routeTypeButton('endzone', 'Endzone', 'bg-pink-600')}
-                    </div>
-                ) : (
-                    <div className="flex-1 flex items-center justify-center text-[10px] big:text-xs text-slate-400 uppercase font-semibold">
-                        Select a player to edit its routes
-                    </div>
-                )}
+                <div className="flex-1 flex bg-slate-950/50 rounded p-0.5 border border-slate-700">
+                    {routeTypeButton('primary', 'Primary (Solid)', 'bg-blue-600')}
+                    {routeTypeButton('option', 'Option', 'bg-amber-600')}
+                    {routeTypeButton('check', 'Check', 'bg-slate-700')}
+                    {routeTypeButton('endzone', 'Endzone', 'bg-pink-600')}
+                </div>
                 {isDrawing ? (
                     <button
                         onClick={onFinishDrawing}
@@ -125,7 +119,7 @@ export const RouteControls: React.FC<RouteControlsProps> = ({
             </div>
 
             {/* Saved Routes */}
-            <div className="flex flex-wrap items-center gap-1">
+            <div className="min-h-5 flex flex-wrap items-center gap-1">
                 <span className="text-[10px] big:text-xs text-slate-500 uppercase font-semibold mr-1">Saved</span>
                 {savedRoutes.length === 0 && !isSavingRoute && (
                     <span className="text-[10px] big:text-xs text-slate-600 italic">none yet</span>
