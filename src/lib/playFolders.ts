@@ -31,9 +31,9 @@ export const FORMATION_NAMES: Record<Formation, string> = {
  * Each one is detected as its own formation by detectFormation; mirror the x for strong side left.
  */
 export const FORMATION_ALIGNMENTS: Record<Formation, number[]> = {
-    // Weak side receiver on the quarter of the field (6.25 yd, on the 0.5 yd grid)
+    // Spread / Twins / Double: weak side receiver on the quarter of the field (6.25 yd, on the 0.5 yd grid)
     spread: [-6.5, 5, 10],
-    twins: [-10, 2, 10],
+    twins: [-6.5, 2, 10],
     trips: [-2, 2, 10],
     // Same 2 yd spacing as the inside receivers in Trips
     tight: [-2, 2, 4],
