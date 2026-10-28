@@ -361,9 +361,13 @@ export function usePlaybook() {
 
         const updatedPlayer = { ...player, ...updates };
 
-        if (updates.position && player.routes.length > 0) {
-            const dx = updates.position.x - player.position.x;
-            const dy = updates.position.y - player.position.y;
+        // Routes start at the motion end (or the position without motion), so keep them attached to it
+        const oldStart = calculateRouteStart(player);
+        const newStart = calculateRouteStart(updatedPlayer);
+        const dx = newStart.x - oldStart.x;
+        const dy = newStart.y - oldStart.y;
+
+        if ((dx !== 0 || dy !== 0) && player.routes.length > 0) {
             updatedPlayer.routes = player.routes.map(r => ({
                 ...r,
                 points: r.points.map(pt => clampPoint({ x: pt.x + dx, y: pt.y + dy }))
