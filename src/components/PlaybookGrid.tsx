@@ -28,6 +28,9 @@ interface PlaybookGridProps {
     style?: React.CSSProperties;
 }
 
+// Minimum play column width: 73px preview + cell padding and border. Columns don't grow with long play names.
+const CELL_MIN_WIDTH = 85;
+
 export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     playbooks,
     currentPlaybookId,
@@ -200,7 +203,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                     {/* Column Headers */}
                     <div
                         className="grid gap-1 mb-1"
-                        style={{ gridTemplateColumns: `40px repeat(${COLS}, 1fr) 40px` }}
+                        style={{ gridTemplateColumns: `40px repeat(${COLS}, minmax(${CELL_MIN_WIDTH}px, 1fr)) 40px` }}
                     >
                         <div className="h-10"></div>
                         {columnNames.map((name, colIndex) => (
@@ -268,7 +271,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                         <div
                             key={rowIndex}
                             className="grid gap-1 mb-1"
-                            style={{ gridTemplateColumns: `40px repeat(${COLS}, 1fr) 40px` }}
+                            style={{ gridTemplateColumns: `40px repeat(${COLS}, minmax(${CELL_MIN_WIDTH}px, 1fr)) 40px` }}
                         >
                             {/* Row Number */}
                             <div className="h-20 bg-slate-800 rounded flex items-center justify-center font-bold text-sm border border-slate-700">
@@ -285,7 +288,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                                         key={colIndex}
                                         onClick={() => handleCellClick(rowIndex, colIndex)}
                                         className={cn(
-                                            "h-20 rounded border-2 transition-all text-xs font-medium flex flex-col items-center justify-center gap-0.5 relative group p-1",
+                                            "h-20 min-w-0 rounded border-2 transition-all text-xs font-medium flex flex-col items-center justify-center gap-0.5 relative group p-1",
                                             play
                                                 ? isCurrentPlayCell
                                                     ? "bg-blue-600/20 border-blue-500 text-blue-300"
@@ -301,7 +304,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                                             <>
                                                 {/* Name + tags row above preview */}
                                                 <div className="flex items-center gap-0.5 w-full px-1 overflow-hidden mb-0.5">
-                                                    <span className="text-[9px] truncate flex-1 leading-tight">{play.name}</span>
+                                                    <span className="text-[9px] truncate flex-1 min-w-0 leading-tight">{play.name}</span>
                                                     {play.tags?.map(tag => (
                                                         <div
                                                             key={tag.id}
