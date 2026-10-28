@@ -1,4 +1,4 @@
-import { MiniPlayPreview } from './MiniPlayPreview';
+import { MiniPlayPreview, YARD_NUMBER_MARGIN } from './MiniPlayPreview';
 import type { Playbook, Play } from '@/types';
 
 interface PrintViewProps {
@@ -10,6 +10,13 @@ interface PrintViewProps {
 export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerPage }) => {
     const ROWS = 4;
     const COLS = playbook.gridConfig.columnNames.length;
+
+    // Match the preview's aspect ratio to the printed play cell (sizes in cm, from the print CSS below),
+    // so narrower cells show more field depth instead of shrinking the play
+    const PREVIEW_WIDTH = 120;
+    const cellWidth = ((11.5 - 0.5) / COLS - 0.3) * 0.95; // card - row number column, minus tag column + padding
+    const cellHeight = ((6.33 - 0.4) / ROWS) * 0.98;     // card - header row
+    const previewHeight = Math.round(PREVIEW_WIDTH * (1 + YARD_NUMBER_MARGIN) * cellHeight / cellWidth);
 
     const getPlayAtCell = (row: number, col: number) => {
         return plays.find(p => p.gridPosition?.row === row && p.gridPosition?.column === col) || null;
@@ -48,10 +55,11 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerP
                                                 <div className="print-play-box">
                                                     <MiniPlayPreview
                                                         play={play}
-                                                        width={120}
-                                                        height={95}
+                                                        width={PREVIEW_WIDTH}
+                                                        height={previewHeight}
                                                         strokeWidth={2.5}
                                                         className="print-mini-preview"
+                                                        yardNumbersOutside
                                                     />
                                                     <div className="print-play-label-container">
                                                         {play.tags?.map(tag => (
@@ -118,8 +126,8 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerP
                     }
 
                     .print-grid-row {
-                        height: 1.48cm;
-                        flex: none;
+                        flex: 1;
+                        min-height: 0;
                         display: flex;
                         border-bottom: 1px solid #333;
                     }
@@ -185,13 +193,14 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerP
                         justify-content: space-between;
                         width: 100%;
                         height: 100%;
-                        padding: 0 2px;
+                        padding: 0 2px 0 1px;
                     }
 
                     .print-mini-preview {
                         flex: 1;
-                        max-width: 95%;
-                        max-height: 98%;
+                        min-width: 0;
+                        width: 95%;
+                        height: 98%;
                     }
 
                     .print-play-label-container {

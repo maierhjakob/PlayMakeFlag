@@ -6,24 +6,31 @@ interface MiniPlayPreviewProps {
     width?: number;
     height?: number;
     strokeWidth?: number;
+    /** Draw the yard numbers in the margin left of the field instead of above the lines */
+    yardNumbersOutside?: boolean;
     className?: string;
 }
+
+// Width of the yard-number strip left of the field, as a fraction of the field width
+export const YARD_NUMBER_MARGIN = 0.06;
 
 export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
     play,
     width = 51,
     height = 70,
     strokeWidth = 1.1,
-    className = ''
+    className = '',
+    yardNumbersOutside = false
 }) => {
     // Field dimensions (25 yards wide @ 25px/yard)
     const VIRTUAL_WIDTH = 625;
-    const VIRTUAL_HEIGHT = 480; // Cropped field depth: 20y (unchanged — keeps scale the same)
-    const Y_START = 95; // Start 2.5 yards (63px) from the top — shifts content down vs. 125
+    const FIELD_BOTTOM = 625; // Bottom edge, so the deepest backfield spot (QB at 4y behind LOS) and its dot stay visible
 
-    // Scale factors
+    // Uniform scale from the width; the height decides how much field depth is shown above the bottom edge
     const SCALE_X = width / VIRTUAL_WIDTH;
-    const SCALE_Y = height / VIRTUAL_HEIGHT;
+    const SCALE_Y = SCALE_X;
+    const Y_START = FIELD_BOTTOM - height / SCALE_Y;
+    const MARGIN = yardNumbersOutside ? width * YARD_NUMBER_MARGIN : 0;
 
     // Helper to get scaled and shifted coordinates
     const getX = (x: number) => x * SCALE_X;
@@ -51,9 +58,10 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
 
     return (
         <svg
-            width={width}
+            width={width + MARGIN}
             height={height}
-            viewBox={`0 0 ${width} ${height}`}
+            viewBox={`${-MARGIN} 0 ${width + MARGIN} ${height}`}
+            preserveAspectRatio={yardNumbersOutside ? 'xMinYMax meet' : 'xMidYMax meet'}
             className={className}
         >
             {/* Field background */}
@@ -67,12 +75,27 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
             />
 
             {/* 7 Yard Marks (Side lines) */}
-            <line x1="0" y1={getYFromLOS(7)} x2={getX(30)} y2={getYFromLOS(7)} stroke="#000000" strokeWidth="0.5" />
-            <line x1={getX(625 - 30)} y1={getYFromLOS(7)} x2={width} y2={getYFromLOS(7)} stroke="#000000" strokeWidth="0.5" />
+            <line x1="0" y1={getYFromLOS(7)} x2={getX(25)} y2={getYFromLOS(7)} stroke="#000000" strokeWidth="0.8" />
+            <line x1={getX(625 - 25)} y1={getYFromLOS(7)} x2={width} y2={getYFromLOS(7)} stroke="#000000" strokeWidth="0.8" />
 
             {/* 5 Yard Marks (Side lines) */}
-            <line x1="0" y1={getYFromLOS(5)} x2={getX(15)} y2={getYFromLOS(5)} stroke="#000000" strokeWidth="0.5" />
-            <line x1={getX(625 - 15)} y1={getYFromLOS(5)} x2={width} y2={getYFromLOS(5)} stroke="#000000" strokeWidth="0.5" />
+            <line x1="0" y1={getYFromLOS(5)} x2={getX(25)} y2={getYFromLOS(5)} stroke="#000000" strokeWidth="1.2" />
+            <line x1={getX(625 - 25)} y1={getYFromLOS(5)} x2={width} y2={getYFromLOS(5)} stroke="#000000" strokeWidth="1.2" />
+
+            {/* Yard numbers (left side, just above each line or in the margin next to it) */}
+            {[10, 7, 5].map(yards => (
+                <text
+                    key={`yard-${yards}`}
+                    x={yardNumbersOutside ? -MARGIN : 0.5}
+                    y={yardNumbersOutside ? getYFromLOS(yards) : getYFromLOS(yards) - 0.8}
+                    dominantBaseline={yardNumbersOutside ? 'central' : undefined}
+                    fontSize={width * 0.045}
+                    fontFamily="sans-serif"
+                    fill="#000000"
+                >
+                    {yards}
+                </text>
+            ))}
 
             {/* Line of scrimmage (Black) */}
             <line
