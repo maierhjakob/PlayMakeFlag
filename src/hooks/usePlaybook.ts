@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag, PlayFolder, SavedRoute } from '@/types';
+import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag, SavedRoute } from '@/types';
+import { buildDepthFolders, countPlayersOver10, depthFolderId } from '@/lib/depthFolders';
 import { POSITIONS, getPos, clampPoint, FIELD_PIXEL_WIDTH } from '@/lib/constants';
 import { generateRoutePoints } from '@/lib/routes';
 import type { RoutePreset } from '@/lib/routes';
@@ -85,19 +86,9 @@ function loadPlaybooks(): Playbook[] {
 // FOLDERS
 // ============================================
 
-const FORMATION_KEYWORDS = [
-    'four-tight', 'three-tight', 'double', 'spread', 'twins', 'trips', 'run'
-];
-
-function detectFormation(name: string): string | undefined {
-    const lower = name.toLowerCase();
-    return FORMATION_KEYWORDS.find(kw => lower.includes(kw));
-}
-
-function loadFolders(): PlayFolder[] {
-    const saved = localStorage.getItem('global_folders');
-    if (saved) return JSON.parse(saved);
-    return [];
+function loadCollapsedFolderIds(): Set<string> {
+    const saved = localStorage.getItem('collapsed_depth_folders');
+    return new Set(saved ? JSON.parse(saved) : []);
 }
 
 function loadSavedRoutes(): SavedRoute[] {
@@ -129,17 +120,20 @@ export function usePlaybook() {
     const [currentPlayId, setCurrentPlayId] = useState<string | null>(null);
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
     const [isSettingMotion, setIsSettingMotion] = useState(false);
-    const [folders, setFolders] = useState<PlayFolder[]>(loadFolders);
+    const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(loadCollapsedFolderIds);
     const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>(loadSavedRoutes);
 
     const currentPlaybook = playbooks.find(pb => pb.id === currentPlaybookId) || playbooks[0] || null;
 
     // All global plays, with grid positions from the current playbook merged in.
     // A play's gridPosition is per-playbook — only set if it's been assigned to a cell here.
+    // Folders are derived from the routes: one per number of players going past the 10 yard line.
     const plays: Play[] = globalPlays.map(play => {
         const entry = currentPlaybook?.entries.find(e => e.playId === play.id);
-        return entry?.gridPosition ? { ...play, gridPosition: entry.gridPosition } : { ...play, gridPosition: undefined };
+        const folderId = depthFolderId(countPlayersOver10(play));
+        return { ...play, folderId, gridPosition: entry?.gridPosition };
     });
+    const folders = buildDepthFolders(globalPlays.map(countPlayersOver10), collapsedFolderIds);
 
     const currentPlay = globalPlays.find(p => p.id === currentPlayId) || null;
     const selectedPlayer = currentPlay?.players.find(p => p.id === selectedPlayerId) || null;
@@ -159,8 +153,8 @@ export function usePlaybook() {
     }, [currentPlaybookId]);
 
     useEffect(() => {
-        localStorage.setItem('global_folders', JSON.stringify(folders));
-    }, [folders]);
+        localStorage.setItem('collapsed_depth_folders', JSON.stringify([...collapsedFolderIds]));
+    }, [collapsedFolderIds]);
 
     useEffect(() => {
         localStorage.setItem('global_saved_routes', JSON.stringify(savedRoutes));
@@ -551,46 +545,15 @@ export function usePlaybook() {
     // FOLDER MANAGEMENT
     // ============================================
 
-    const handleCreateFolder = (name: string, parentId?: string) => {
-        const maxOrder = folders.filter(f => f.parentId === parentId).reduce((m, f) => Math.max(m, f.order), -1);
-        const newFolder: PlayFolder = {
-            id: crypto.randomUUID(),
-            name,
-            isExpanded: true,
-            order: maxOrder + 1,
-            ...(parentId ? { parentId } : {})
-        };
-        setFolders(prev => [...prev, newFolder]);
-    };
-
-    const handleDeleteFolder = (id: string) => {
-        // Collect ids to remove: the folder itself + all sub-folders
-        setFolders(prev => {
-            const toRemove = new Set<string>([id]);
-            prev.forEach(f => { if (f.parentId === id) toRemove.add(f.id); });
-            // Clear folderId on plays that belonged to removed folders
-            setGlobalPlays(gp => gp.map(p =>
-                p.folderId && toRemove.has(p.folderId) ? { ...p, folderId: undefined } : p
-            ));
-            return prev.filter(f => !toRemove.has(f.id));
+    const handleToggleFolder = (id: string) => {
+        setCollapsedFolderIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
         });
     };
 
-    const handleRenameFolder = (id: string, name: string) => {
-        setFolders(prev => prev.map(f => f.id === id ? { ...f, name } : f));
-    };
-
-    const handleToggleFolder = (id: string) => {
-        setFolders(prev => prev.map(f => f.id === id ? { ...f, isExpanded: !f.isExpanded } : f));
-    };
-
-    const handleAssignPlayToFolder = (playId: string, folderId: string | undefined) => {
-        setGlobalPlays(prev => prev.map(p =>
-            p.id === playId ? { ...p, folderId } : p
-        ));
-    };
-
-    const handleReorderPlayInFolder = (draggedId: string, targetId: string, folderId: string | undefined) => {
+    const handleReorderPlay = (draggedId: string, targetId: string) => {
         setGlobalPlays(prev => {
             const arr = [...prev];
             const draggedIdx = arr.findIndex(p => p.id === draggedId);
@@ -598,75 +561,9 @@ export function usePlaybook() {
             if (draggedIdx === -1 || targetIdx === -1 || draggedIdx === targetIdx) return prev;
             const [dragged] = arr.splice(draggedIdx, 1);
             const insertAt = arr.findIndex(p => p.id === targetId);
-            arr.splice(insertAt, 0, { ...dragged, folderId });
+            arr.splice(insertAt, 0, dragged);
             return arr;
         });
-    };
-
-    const handleAutoSortByTags = () => {
-        // Collect unique tag texts across all plays
-        const tagSet = new Set<string>();
-        globalPlays.forEach(p => (p.tags || []).forEach(t => tagSet.add(t.text)));
-        const tagNames = Array.from(tagSet);
-
-        // Create one top-level folder per tag text (if not already existing with same name)
-        const existingNames = new Map(folders.filter(f => !f.parentId).map(f => [f.name, f.id]));
-        const tagFolderIds = new Map<string, string>();
-        const newFolders: PlayFolder[] = [];
-        let order = folders.filter(f => !f.parentId).reduce((m, f) => Math.max(m, f.order), -1) + 1;
-
-        tagNames.forEach(tag => {
-            if (existingNames.has(tag)) {
-                tagFolderIds.set(tag, existingNames.get(tag)!);
-            } else {
-                const id = crypto.randomUUID();
-                newFolders.push({ id, name: tag, isExpanded: true, order: order++ });
-                tagFolderIds.set(tag, id);
-            }
-        });
-
-        setFolders(prev => [...prev, ...newFolders]);
-
-        // Assign plays to first matched tag folder
-        setGlobalPlays(prev => prev.map(p => {
-            const firstTag = (p.tags || [])[0];
-            if (!firstTag) return p;
-            const fid = tagFolderIds.get(firstTag.text);
-            return fid ? { ...p, folderId: fid } : p;
-        }));
-    };
-
-    const handleAutoSortByFormation = () => {
-        const detected = new Set<string>();
-        globalPlays.forEach(p => {
-            const kw = detectFormation(p.name);
-            if (kw) detected.add(kw);
-        });
-        const keywords = Array.from(detected);
-
-        const existingNames = new Map(folders.filter(f => !f.parentId).map(f => [f.name, f.id]));
-        const kwFolderIds = new Map<string, string>();
-        const newFolders: PlayFolder[] = [];
-        let order = folders.filter(f => !f.parentId).reduce((m, f) => Math.max(m, f.order), -1) + 1;
-
-        keywords.forEach(kw => {
-            if (existingNames.has(kw)) {
-                kwFolderIds.set(kw, existingNames.get(kw)!);
-            } else {
-                const id = crypto.randomUUID();
-                newFolders.push({ id, name: kw, isExpanded: true, order: order++ });
-                kwFolderIds.set(kw, id);
-            }
-        });
-
-        setFolders(prev => [...prev, ...newFolders]);
-
-        setGlobalPlays(prev => prev.map(p => {
-            const kw = detectFormation(p.name);
-            if (!kw) return p;
-            const fid = kwFolderIds.get(kw);
-            return fid ? { ...p, folderId: fid } : p;
-        }));
     };
 
     // ============================================
@@ -934,13 +831,7 @@ export function usePlaybook() {
 
         // Folders
         folders,
-        handleCreateFolder,
-        handleDeleteFolder,
-        handleRenameFolder,
         handleToggleFolder,
-        handleAssignPlayToFolder,
-        handleReorderPlayInFolder,
-        handleAutoSortByTags,
-        handleAutoSortByFormation,
+        handleReorderPlay,
     };
 }

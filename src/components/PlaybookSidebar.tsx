@@ -40,12 +40,8 @@ interface PlaybookSidebarProps {
     onApplySavedRoute: (savedRouteId: string, routeType: 'primary' | 'option' | 'check' | 'endzone') => void;
     // Folder props
     folders: PlayFolder[];
-    onCreateFolder: (name: string, parentId?: string) => void;
-    onDeleteFolder: (id: string) => void;
-    onRenameFolder: (id: string, name: string) => void;
     onToggleFolder: (id: string) => void;
-    onAssignPlayToFolder: (playId: string, folderId: string | undefined) => void;
-    onReorderPlayInFolder: (draggedId: string, targetId: string, folderId: string | undefined) => void;
+    onReorderPlay: (draggedId: string, targetId: string) => void;
     className?: string;
     style?: React.CSSProperties;
 }
@@ -78,12 +74,8 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     onDeleteSavedRoute,
     onApplySavedRoute,
     folders,
-    onCreateFolder,
-    onDeleteFolder,
-    onRenameFolder,
     onToggleFolder,
-    onAssignPlayToFolder,
-    onReorderPlayInFolder,
+    onReorderPlay,
     className,
     style
 }) => {
@@ -150,11 +142,7 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                             currentPlayId={currentPlayId}
                             onSelectPlay={onSelectPlay}
                             onToggleFolder={onToggleFolder}
-                            onCreateFolder={onCreateFolder}
-                            onDeleteFolder={onDeleteFolder}
-                            onRenameFolder={onRenameFolder}
-                            onAssignPlayToFolder={onAssignPlayToFolder}
-                            onReorderPlayInFolder={onReorderPlayInFolder}
+                            onReorderPlay={onReorderPlay}
                         />
                     </div>
 

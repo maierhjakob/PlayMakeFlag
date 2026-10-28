@@ -72,12 +72,8 @@ function App() {
     handleApplySavedRoute,
     // Folders
     folders,
-    handleCreateFolder,
-    handleDeleteFolder,
-    handleRenameFolder,
     handleToggleFolder,
-    handleAssignPlayToFolder,
-    handleReorderPlayInFolder,
+    handleReorderPlay,
   } = usePlaybook();
 
   // Mobile layout state
@@ -574,12 +570,8 @@ function App() {
           onDeleteSavedRoute={handleDeleteSavedRoute}
           onApplySavedRoute={(id, type) => handleApplySavedRoute(id, type)}
           folders={folders}
-          onCreateFolder={handleCreateFolder}
-          onDeleteFolder={handleDeleteFolder}
-          onRenameFolder={handleRenameFolder}
           onToggleFolder={handleToggleFolder}
-          onAssignPlayToFolder={handleAssignPlayToFolder}
-          onReorderPlayInFolder={handleReorderPlayInFolder}
+          onReorderPlay={handleReorderPlay}
         />
 
         {/* Left resize handle */}
