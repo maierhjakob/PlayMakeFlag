@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, FolderOpen, Copy, MoveRight, ChevronUp, ChevronDown, FlipHorizontal2, WandSparkles, BringToFront, SendToBack } from 'lucide-react';
+import { Plus, Trash2, FolderOpen, Copy, MoveRight, ChevronUp, ChevronDown, FlipHorizontal2, WandSparkles, BringToFront, SendToBack, Search, X } from 'lucide-react';
 import { getPos, S } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { Play, Player, PlayTag, PlayFolder } from '@/types';
@@ -60,6 +60,19 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
 
     const [formationSide, setFormationSide] = useState<'left' | 'right'>('right');
 
+    // Search by play name or tag text; while searching only folders with matches are shown, expanded
+    const [playSearch, setPlaySearch] = useState('');
+    const searchTerm = playSearch.trim().toLowerCase();
+    const visiblePlays = searchTerm
+        ? plays.filter(p => p.name.toLowerCase().includes(searchTerm)
+            || (p.tags || []).some(t => t.text.toLowerCase().includes(searchTerm)))
+        : plays;
+    const visibleFolders = searchTerm
+        ? folders
+            .filter(f => visiblePlays.some(p => p.folderId === f.id || p.folderId?.startsWith(`${f.id}/`)))
+            .map(f => ({ ...f, isExpanded: true }))
+        : folders;
+
     // Build ordered play list matching the folder tree's visual order
     const topFoldersSorted = [...folders]
         .filter(f => !f.parentId)
@@ -113,10 +126,31 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                             </button>
                         </div>
                     </div>
+                    <div className="relative">
+                        <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        <input
+                            type="text"
+                            value={playSearch}
+                            onChange={(e) => setPlaySearch(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Escape') setPlaySearch(''); }}
+                            placeholder="Search plays…"
+                            className="w-full bg-slate-900 border border-slate-700 rounded pl-7 pr-7 py-1 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+                        />
+                        {playSearch && (
+                            <button
+                                onClick={() => setPlaySearch('')}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-200"
+                                title="Clear search"
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
+                    </div>
                     <div className="border border-slate-700 bg-slate-900/50">
                         <FolderTree
-                            plays={plays}
-                            folders={folders}
+                            plays={visiblePlays}
+                            folders={visibleFolders}
+                            emptyMessage={searchTerm ? 'No plays match your search' : undefined}
                             currentPlayId={currentPlayId}
                             onSelectPlay={onSelectPlay}
                             onToggleFolder={onToggleFolder}

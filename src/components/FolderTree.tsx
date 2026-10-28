@@ -10,6 +10,8 @@ interface FolderTreeProps {
     onSelectPlay: (id: string) => void;
     onToggleFolder: (id: string) => void;
     onReorderPlay: (draggedId: string, targetId: string) => void;
+    /** Shown instead of the folders when there are no plays */
+    emptyMessage?: string;
 }
 
 interface PlayRowProps {
@@ -67,6 +69,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
     onSelectPlay,
     onToggleFolder,
     onReorderPlay,
+    emptyMessage = 'No plays yet',
 }) => {
     const [draggedPlayId, setDraggedPlayId] = useState<string | null>(null);
 
@@ -134,7 +137,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
             className="max-h-64 overflow-y-auto text-sm scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900"
         >
             {plays.length === 0 && (
-                <div className="px-2 py-1 text-[10px] text-slate-600">No plays yet</div>
+                <div className="px-2 py-1 text-[10px] text-slate-600">{emptyMessage}</div>
             )}
 
             {topFolders.map(folder => (

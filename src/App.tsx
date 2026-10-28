@@ -22,6 +22,8 @@ import {
 } from '@/lib/shareUtils'
 import { Capacitor } from '@capacitor/core'
 import { App as NativeApp } from '@capacitor/app'
+import { Share } from '@capacitor/share'
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 
 const FIELD_PX = 625;
 // Padding around the field column in the center pane on desktop (md:p-8)
@@ -306,7 +308,28 @@ function App() {
         type: 'text/html'
       });
 
-      // 4. Share File
+      // 4a. Native app: write the file to the cache and open the system share sheet
+      if (Capacitor.isNativePlatform()) {
+        const { uri } = await Filesystem.writeFile({
+          path: file.name.replace(/[^\w.-]/g, '_'),
+          data: htmlContent,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+        });
+        try {
+          await Share.share({
+            title: `Playbook: ${currentPlaybook.name}`,
+            text: `Open the attached file to view the playbook: ${currentPlaybook.name}`,
+            files: [uri],
+            dialogTitle: 'Share playbook',
+          });
+        } catch {
+          // Share sheet dismissed
+        }
+        return;
+      }
+
+      // 4b. Share File
       if (navigator.share) {
         try {
           await navigator.share({
