@@ -40,3 +40,14 @@ export const POSITIONS = {
     'SL': { role: 'SL', label: '', x: -5, depth: -1, color: '#22c55e' }, // Green (Slot)
     'SR': { role: 'SR', label: '', x: 5, depth: -1, color: '#22c55e' }, // Green (SR)
 } as const;
+
+/* Default colors offered in the color pickers */
+export const COLOR_PRESETS = [
+    { name: 'Blue', value: '#3b82f6' },
+    { name: 'Yellow', value: '#eab308' },
+    { name: 'Green', value: '#22c55e' },
+    { name: 'Red', value: '#ef4444' },
+    { name: 'Gray', value: '#999999' },
+    { name: 'Pink', value: '#ec4899' },
+    { name: 'Black', value: '#000000' },
+] as const;

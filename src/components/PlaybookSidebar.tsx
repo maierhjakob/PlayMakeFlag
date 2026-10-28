@@ -5,6 +5,7 @@ import { getPos, S } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { Play, Player, PlayTag, PlayFolder, SavedRoute } from '@/types';
 import { FolderTree } from '@/components/FolderTree';
+import { ColorSwatches } from '@/components/ColorSwatches';
 
 interface PlaybookSidebarProps {
     plays: Play[];
@@ -247,6 +248,14 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                                         }}
                                         className="w-10 h-6 bg-slate-900 border border-slate-700 rounded cursor-pointer p-0.5"
                                     />
+                                    <ColorSwatches
+                                        value={tag.color}
+                                        onChange={(color) => {
+                                            const currentTags = [...(plays.find(p => p.id === currentPlayId)?.tags || [])];
+                                            currentTags[idx] = { ...tag, color };
+                                            onUpdatePlayTags(currentPlayId, currentTags);
+                                        }}
+                                    />
                                     <button
                                         onClick={() => {
                                             const currentTags = (plays.find(p => p.id === currentPlayId)?.tags || []).filter(t => t.id !== tag.id);
@@ -292,6 +301,11 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                                 />
                             </div>
                         </div>
+                        <ColorSwatches
+                            value={selectedPlayer.color}
+                            onChange={(color) => onUpdatePlayer(selectedPlayer.id, { color })}
+                            className="justify-end"
+                        />
 
                         {/* Position Selector */}
                         <div>
