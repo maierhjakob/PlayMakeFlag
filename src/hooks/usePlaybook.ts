@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag, SavedRoute } from '@/types';
-import { buildPlayFolders, playFolderId } from '@/lib/playFolders';
-import { POSITIONS, getPos, clampPoint, FIELD_PIXEL_WIDTH } from '@/lib/constants';
+import { buildPlayFolders, playFolderId, FORMATION_ALIGNMENTS, type Formation } from '@/lib/playFolders';
+import { POSITIONS, getPos, clampPoint, FIELD_PIXEL_WIDTH, S } from '@/lib/constants';
 import { generateRoutePoints } from '@/lib/routes';
 import type { RoutePreset } from '@/lib/routes';
 
@@ -374,6 +374,18 @@ export function usePlaybook() {
         });
     };
 
+    /** Routes are drawn in player order (later on top), so moving a player changes which routes cover which. */
+    const handleMovePlayerLayer = (id: string, to: 'front' | 'back') => {
+        if (!currentPlay) return;
+        const player = currentPlay.players.find(p => p.id === id);
+        if (!player) return;
+        const others = currentPlay.players.filter(p => p.id !== id);
+        updateCurrentPlay({
+            ...currentPlay,
+            players: to === 'front' ? [...others, player] : [player, ...others]
+        });
+    };
+
     const handleSetPosition = (role: string) => {
         if (!selectedPlayer || !currentPlay) return;
         const positionData = POSITIONS[role as keyof typeof POSITIONS];
@@ -386,38 +398,38 @@ export function usePlaybook() {
         });
     };
 
-    const handleFormation = (type: 'strong-left' | 'strong-right') => {
+    /**
+     * Line the receivers up in a formation. Receivers keep their left-to-right order (and their
+     * color, label and routes); motion is removed since the formation is where they stand at the snap.
+     */
+    const handleFormation = (formation: Formation, side: 'left' | 'right') => {
         if (!currentPlay) return;
         pushToUndoStack();
 
-        const formations = {
-            'strong-left': [
-                { role: 'C',    x: 0,   y: -1 },
-                { role: 'QB',   x: 0,   y: -4 },
-                { role: 'WR-L', x: -10, y: -1 },
-                { role: 'WR-R', x: 10,  y: -1 },
-                { role: 'SR',   x: -5,  y: -1 },
-            ],
-            'strong-right': [
-                { role: 'C',    x: 0,   y: -1 },
-                { role: 'QB',   x: 0,   y: -4 },
-                { role: 'WR-L', x: -10, y: -1 },
-                { role: 'WR-R', x: 10,  y: -1 },
-                { role: 'SR',   x: 5,   y: -1 },
-            ]
-        };
+        const center = currentPlay.players.find(p => p.role === 'C');
+        const centerX = center ? center.position.x : getPos(0, 0).x;
+        const slots = FORMATION_ALIGNMENTS[formation]
+            .map(x => (side === 'left' ? -x : x))
+            .sort((a, b) => a - b);
+        const receivers = currentPlay.players
+            .filter(p => p.role !== 'QB' && p.role !== 'C')
+            .sort((a, b) => calculateRouteStart(a).x - calculateRouteStart(b).x);
 
-        const formation = formations[type];
-        const updatedPlayers = currentPlay.players.map((player, index) => {
-            const formationPos = formation[index];
-            if (!formationPos) return player;
+        const updatedPlayers = currentPlay.players.map(player => {
+            const slot = slots[receivers.indexOf(player)];
+            if (slot === undefined) return player;
+            const position = clampPoint({ x: centerX + slot * S, y: getPos(0, -1).y });
+            const oldStart = calculateRouteStart(player);
+            const dx = position.x - oldStart.x;
+            const dy = position.y - oldStart.y;
             return {
                 ...player,
-                role: formationPos.role,
-                position: getPos(formationPos.x, formationPos.y),
-                color: POSITIONS[formationPos.role as keyof typeof POSITIONS]?.color || player.color,
-                routes: [],
-                motion: null
+                position,
+                motion: null,
+                routes: player.routes.map(r => ({
+                    ...r,
+                    points: r.points.map(pt => clampPoint({ x: pt.x + dx, y: pt.y + dy }))
+                }))
             };
         });
 
@@ -789,6 +801,7 @@ export function usePlaybook() {
 
         // Player actions
         handleUpdatePlayer,
+        handleMovePlayerLayer,
         handleSetPosition,
         handleFormation,
 

@@ -4,6 +4,7 @@ import { PlaybookSidebar } from '@/components/PlaybookSidebar'
 import { PlaybookGrid } from '@/components/PlaybookGrid'
 import { PlayerToken } from '@/components/PlayerToken'
 import { RoutePath } from '@/components/RoutePath'
+import { RouteControls } from '@/components/RouteControls'
 import { PrintModal, type PrintSettings } from '@/components/PrintModal'
 import { PrintView } from '@/components/PrintView'
 import type { Point, RouteType, RouteSegment } from '@/types'
@@ -18,6 +19,12 @@ import {
   toBase64URL,
   fromBase64URL
 } from '@/lib/shareUtils'
+
+const FIELD_PX = 625;
+// Padding around the field column in the center pane on desktop (md:p-8)
+const CENTER_PANE_PADDING = 32;
+// Below this the field gets too small to draw on; the pane scrolls instead
+const MIN_DESKTOP_FIELD_SCALE = 0.6;
 
 function App() {
   const {
@@ -46,6 +53,7 @@ function App() {
     handleUpdatePlayName,
     handleUpdatePlayTags,
     handleUpdatePlayer,
+    handleMovePlayerLayer,
     handleSetPosition,
     handleFormation,
     handleApplyRoute,
@@ -134,7 +142,6 @@ function App() {
         setFieldScale(Math.min(1, window.innerWidth / 641));
         setIsMobile(true);
       } else {
-        setFieldScale(1);
         setIsMobile(false);
       }
     };
@@ -142,6 +149,33 @@ function App() {
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
+
+  // Desktop: shrink the field so it fits next to the route controls without scrolling
+  const centerPaneRef = useRef<HTMLDivElement>(null);
+  const fieldColumnRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isMobile) return;
+    const pane = centerPaneRef.current;
+    const column = fieldColumnRef.current;
+    if (!pane || !column) return;
+    const fit = () => {
+      setFieldScale(scale => {
+        // Height of everything in the column except the field itself, plus the pane padding
+        const otherHeight = column.offsetHeight - FIELD_PX * scale + 2 * CENTER_PANE_PADDING;
+        const fitted = Math.min(
+          1,
+          (pane.clientHeight - otherHeight) / FIELD_PX,
+          (pane.clientWidth - 2 * CENTER_PANE_PADDING) / FIELD_PX
+        );
+        const next = Math.max(MIN_DESKTOP_FIELD_SCALE, Math.floor(fitted * 100) / 100);
+        return Math.abs(next - scale) >= 0.01 ? next : scale;
+      });
+    };
+    const observer = new ResizeObserver(fit);
+    observer.observe(pane);
+    observer.observe(column);
+    return () => observer.disconnect();
+  }, [isMobile]);
 
   // Sidebar resize drag handling
   useEffect(() => {
@@ -548,27 +582,17 @@ function App() {
           onDeletePlay={handleDeletePlay}
           onUpdatePlayName={handleUpdatePlayName}
           onUpdatePlayTags={handleUpdatePlayTags}
-          onStartDrawing={startDrawing}
-          onClearRoutes={clearRoutes}
           onUpdatePlayer={handleUpdatePlayer}
+          onMovePlayerLayer={handleMovePlayerLayer}
           onSetFormation={handleFormation}
-          onApplyRoute={(preset) => handleApplyRoute(preset, activeRouteType)}
           onSetPosition={handleSetPosition}
           onSetMotionMode={() => { setIsSettingMotion(!isSettingMotion); if (!isSettingMotion) setMobileTab('field'); }}
           onExportPlaybook={handleExportPlaybook}
           onCopyPlay={handleCopyPlay}
           onMirrorPlay={handleMirrorPlay}
-          activeRouteType={activeRouteType}
-          onSetActiveRouteType={setActiveRouteType}
-          isDrawing={isDrawing}
-          onFinishDrawing={finishDrawing}
           // Motion props
           isSettingMotion={isSettingMotion}
           onClearMotion={handleClearMotion}
-          savedRoutes={savedRoutes}
-          onSaveRoute={handleSaveRoute}
-          onDeleteSavedRoute={handleDeleteSavedRoute}
-          onApplySavedRoute={(id, type) => handleApplySavedRoute(id, type)}
           folders={folders}
           onToggleFolder={handleToggleFolder}
           onReorderPlay={handleReorderPlay}
@@ -581,9 +605,9 @@ function App() {
         />
 
         {/* Center - Field */}
-        <div className={cn("flex-1 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto", mobileTab === 'field' ? 'flex' : 'hidden md:flex')}>
-          <div className="p-4 md:p-8 flex items-start gap-4">
-            <div className="flex flex-col items-center gap-2">
+        <div ref={centerPaneRef} className={cn("flex-1 flex items-start justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto", mobileTab === 'field' ? 'flex' : 'hidden md:flex')}>
+          <div className="w-full p-4 md:p-8 flex items-start justify-center gap-4">
+            <div ref={fieldColumnRef} className="w-full flex flex-col items-center gap-2">
               {/* Tags above the field */}
               {currentPlay?.tags && currentPlay.tags.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap justify-center w-full">
@@ -821,6 +845,24 @@ function App() {
                 </Field>
                 </div>
               </div>
+
+              {/* Route controls for the selected player, below the field */}
+              <RouteControls
+                className="w-full max-w-[880px]"
+                style={{ minWidth: FIELD_PX * fieldScale }}
+                selectedPlayer={selectedPlayer}
+                activeRouteType={activeRouteType}
+                onSetActiveRouteType={setActiveRouteType}
+                onApplyRoute={(preset) => handleApplyRoute(preset, activeRouteType)}
+                onStartDrawing={startDrawing}
+                onFinishDrawing={finishDrawing}
+                onClearRoutes={clearRoutes}
+                isDrawing={isDrawing}
+                savedRoutes={savedRoutes}
+                onSaveRoute={handleSaveRoute}
+                onDeleteSavedRoute={handleDeleteSavedRoute}
+                onApplySavedRoute={(id, type) => handleApplySavedRoute(id, type)}
+              />
             </div>
 
           </div>

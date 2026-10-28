@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, FolderOpen, MousePointer2, Copy, MoveRight, ChevronUp, ChevronDown, FlipHorizontal2, WandSparkles } from 'lucide-react';
-import { ROUTE_PRESETS } from '@/lib/routes';
+import { Plus, Trash2, FolderOpen, Copy, MoveRight, ChevronUp, ChevronDown, FlipHorizontal2, WandSparkles, BringToFront, SendToBack } from 'lucide-react';
 import { getPos, S } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { Play, Player, PlayTag, PlayFolder, SavedRoute } from '@/types';
+import type { Play, Player, PlayTag, PlayFolder } from '@/types';
 import { FolderTree } from '@/components/FolderTree';
 import { ColorSwatches } from '@/components/ColorSwatches';
 import { generatePlayName } from '@/lib/playNames';
+import { FORMATIONS, FORMATION_NAMES, type Formation } from '@/lib/playFolders';
 
 interface PlaybookSidebarProps {
     plays: Play[];
@@ -17,28 +17,17 @@ interface PlaybookSidebarProps {
     onDeletePlay: (id: string) => void;
     onUpdatePlayName: (id: string, name: string) => void;
     onUpdatePlayTags: (id: string, tags: PlayTag[]) => void;
-    onStartDrawing: (type: 'primary' | 'option' | 'check' | 'endzone') => void;
-    onClearRoutes: () => void;
     onUpdatePlayer: (id: string, updates: Partial<Player>) => void;
-    onSetFormation: (type: 'strong-left' | 'strong-right') => void;
+    onMovePlayerLayer: (id: string, to: 'front' | 'back') => void;
+    onSetFormation: (formation: Formation, side: 'left' | 'right') => void;
     onSetPosition: (role: string) => void;
-    onApplyRoute: (preset: any) => void;
     onExportPlaybook: () => void;
     onCopyPlay: (id: string) => void;
     onMirrorPlay: (id: string) => void;
-    activeRouteType: 'primary' | 'option' | 'check' | 'endzone';
-    onSetActiveRouteType: (type: 'primary' | 'option' | 'check' | 'endzone') => void;
-    isDrawing: boolean;
-    onFinishDrawing: () => void;
     // Motion props
     isSettingMotion: boolean;
     onSetMotionMode: () => void;
     onClearMotion: () => void;
-    // Saved route props
-    savedRoutes: SavedRoute[];
-    onSaveRoute: (name: string, routeType: 'primary' | 'option' | 'check' | 'endzone') => void;
-    onDeleteSavedRoute: (id: string) => void;
-    onApplySavedRoute: (savedRouteId: string, routeType: 'primary' | 'option' | 'check' | 'endzone') => void;
     // Folder props
     folders: PlayFolder[];
     onToggleFolder: (id: string) => void;
@@ -56,32 +45,22 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
     onDeletePlay,
     onUpdatePlayName,
     onUpdatePlayTags,
-    onStartDrawing,
-    onClearRoutes,
     onUpdatePlayer,
+    onMovePlayerLayer,
     onSetFormation,
     onSetPosition,
-    onApplyRoute,
     onExportPlaybook,
     onCopyPlay,
     onMirrorPlay,
-    activeRouteType,
-    onSetActiveRouteType,
-    isDrawing,
-    onFinishDrawing,
     onClearMotion,
-    savedRoutes,
-    onSaveRoute,
-    onDeleteSavedRoute,
-    onApplySavedRoute,
     folders,
     onToggleFolder,
     onReorderPlay,
     className,
     style
 }) => {
-    const [savingRouteName, setSavingRouteName] = useState('');
-    const [isSavingRoute, setIsSavingRoute] = useState(false);
+
+    const [formationSide, setFormationSide] = useState<'left' | 'right'>('right');
 
     // Build ordered play list matching the folder tree's visual order
     const topFoldersSorted = [...folders]
@@ -309,6 +288,27 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                             className="justify-end"
                         />
 
+                        {/* Layering: routes of players further back are drawn on top */}
+                        <div>
+                            <label className="text-[10px] text-slate-500 uppercase font-semibold">Route Layer</label>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => onMovePlayerLayer(selectedPlayer.id, 'front')}
+                                    className="flex-1 bg-slate-800 hover:bg-slate-700 py-1.5 px-2 rounded text-[10px] text-slate-300 border border-slate-700 flex items-center justify-center gap-1"
+                                    title="Draw this player's routes above the others"
+                                >
+                                    <BringToFront size={12} /> Bring to front
+                                </button>
+                                <button
+                                    onClick={() => onMovePlayerLayer(selectedPlayer.id, 'back')}
+                                    className="flex-1 bg-slate-800 hover:bg-slate-700 py-1.5 px-2 rounded text-[10px] text-slate-300 border border-slate-700 flex items-center justify-center gap-1"
+                                    title="Draw this player's routes below the others"
+                                >
+                                    <SendToBack size={12} /> Send to back
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Position Selector */}
                         <div>
                             <label className="text-[10px] text-slate-500 uppercase font-semibold">Position Role</label>
@@ -447,188 +447,39 @@ export const PlaybookSidebar: React.FC<PlaybookSidebarProps> = ({
                                 </div>
                             )}
                         </div>
-
-
-
-                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/50">
-                            {/* Route Type Toggle */}
-                            <div className="col-span-2">
-                                <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2 text-center">Active Route Layer</div>
-                                <div className="flex bg-slate-900 rounded p-1 border border-slate-700">
-                                    <button
-                                        onClick={() => onSetActiveRouteType('primary')}
-                                        className={cn(
-                                            "flex-1 py-1 rounded text-[10px] font-medium transition-all",
-                                            activeRouteType === 'primary' ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"
-                                        )}
-                                    >
-                                        Primary (Solid)
-                                    </button>
-                                    <button
-                                        onClick={() => onSetActiveRouteType('option')}
-                                        className={cn(
-                                            "flex-1 py-1 rounded text-[10px] font-medium transition-all",
-                                            activeRouteType === 'option' ? "bg-amber-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"
-                                        )}
-                                    >
-                                        Option
-                                    </button>
-                                    <button
-                                        onClick={() => onSetActiveRouteType('check')}
-                                        className={cn(
-                                            "flex-1 py-1 rounded text-[10px] font-medium transition-all",
-                                            activeRouteType === 'check' ? "bg-slate-700 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"
-                                        )}
-                                    >
-                                        Check
-                                    </button>
-                                    <button
-                                        onClick={() => onSetActiveRouteType('endzone')}
-                                        className={cn(
-                                            "flex-1 py-1 rounded text-[10px] font-medium transition-all",
-                                            activeRouteType === 'endzone' ? "bg-pink-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"
-                                        )}
-                                    >
-                                        Endzone
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Route Presets */}
-                            <div className="col-span-2 mt-1">
-                                <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2">Preset Routes</div>
-                                <div className="grid grid-cols-3 gap-1.5">
-                                    {ROUTE_PRESETS.map(preset => {
-                                        const isActive = selectedPlayer.routes.find(r => r.type === activeRouteType)?.preset === preset.value;
-                                        return (
-                                            <button
-                                                key={preset.value}
-                                                onClick={() => onApplyRoute(preset.value)}
-                                                className={cn(
-                                                    "px-1 py-1.5 rounded text-[10px] border transition-all truncate",
-                                                    isActive
-                                                        ? "bg-blue-600 border-blue-400 text-white shadow-sm"
-                                                        : "bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600"
-                                                )}
-                                                title={preset.label}
-                                            >
-                                                {preset.label.replace(' (5)', '')}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Saved Routes */}
-                            <div className="col-span-2 mt-1">
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <div className="text-[10px] text-slate-500 uppercase font-semibold">Saved Routes</div>
-                                    {selectedPlayer.routes.find(r => r.type === activeRouteType) && !isSavingRoute && (
-                                        <button
-                                            onClick={() => { setIsSavingRoute(true); setSavingRouteName(''); }}
-                                            className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-0.5"
-                                        >
-                                            <Plus size={10} /> Save current
-                                        </button>
-                                    )}
-                                </div>
-                                {isSavingRoute && (
-                                    <div className="flex gap-1 mb-1.5">
-                                        <input
-                                            autoFocus
-                                            type="text"
-                                            value={savingRouteName}
-                                            onChange={e => setSavingRouteName(e.target.value)}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Enter' && savingRouteName.trim()) {
-                                                    onSaveRoute(savingRouteName.trim(), activeRouteType);
-                                                    setIsSavingRoute(false);
-                                                }
-                                                if (e.key === 'Escape') setIsSavingRoute(false);
-                                            }}
-                                            placeholder="Route name…"
-                                            className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500"
-                                        />
-                                        <button
-                                            onClick={() => {
-                                                if (savingRouteName.trim()) {
-                                                    onSaveRoute(savingRouteName.trim(), activeRouteType);
-                                                }
-                                                setIsSavingRoute(false);
-                                            }}
-                                            className="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-xs"
-                                        >
-                                            Save
-                                        </button>
-                                    </div>
-                                )}
-                                {savedRoutes.length === 0 && !isSavingRoute && (
-                                    <div className="text-[10px] text-slate-600 italic">No saved routes yet</div>
-                                )}
-                                <div className="grid grid-cols-3 gap-1.5">
-                                    {savedRoutes.map(sr => (
-                                        <div key={sr.id} className="relative group">
-                                            <button
-                                                onClick={() => onApplySavedRoute(sr.id, activeRouteType)}
-                                                className="w-full px-1 py-1.5 rounded text-[10px] border transition-all truncate bg-slate-700 hover:bg-purple-800/50 text-slate-200 border-slate-600 hover:border-purple-500"
-                                                title={sr.name}
-                                            >
-                                                {sr.name}
-                                            </button>
-                                            <button
-                                                onClick={() => onDeleteSavedRoute(sr.id)}
-                                                className="absolute -top-1 -right-1 hidden group-hover:flex w-4 h-4 bg-red-900 hover:bg-red-700 text-white rounded-full text-[9px] items-center justify-center"
-                                                title="Delete saved route"
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="col-span-2 pt-2 border-t border-slate-700/50 flex gap-2">
-                                {isDrawing ? (
-                                    <button
-                                        onClick={onFinishDrawing}
-                                        className="flex-1 bg-emerald-900/30 hover:bg-emerald-900/50 px-2 py-1.5 rounded text-xs text-emerald-300 border border-emerald-800 transition-colors flex items-center justify-center gap-1 animate-pulse"
-                                    >
-                                        <MousePointer2 size={12} /> Finish
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={() => onStartDrawing('primary')}
-                                        className="flex-1 bg-blue-900/30 hover:bg-blue-900/50 px-2 py-1.5 rounded text-xs text-blue-300 border border-blue-800 transition-colors flex items-center justify-center gap-1"
-                                    >
-                                        <MousePointer2 size={12} /> Draw
-                                    </button>
-                                )}
-                                <button
-                                    onClick={onClearRoutes}
-                                    className="bg-red-900/20 hover:bg-red-900/40 text-red-400 px-2 py-1.5 rounded text-xs border border-red-900/30 transition-colors"
-                                >
-                                    Clear
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 )}
 
                 {currentPlayId && (
                     <div className="p-4 border-t border-slate-700 space-y-2 bg-slate-950/30">
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => onSetFormation('strong-left')}
-                                className="flex-1 bg-slate-800 hover:bg-slate-700 py-1.5 px-2 rounded text-[10px] text-slate-400 border border-slate-700"
-                            >
-                                Strong Left
-                            </button>
-                            <button
-                                onClick={() => onSetFormation('strong-right')}
-                                className="flex-1 bg-slate-800 hover:bg-slate-700 py-1.5 px-2 rounded text-[10px] text-slate-400 border border-slate-700"
-                            >
-                                Strong Right
-                            </button>
+                        <div className="flex items-center justify-between">
+                            <label className="text-[10px] text-slate-500 uppercase font-semibold">Formation</label>
+                            {/* Strong side */}
+                            <div className="flex bg-slate-900 rounded p-0.5 border border-slate-700">
+                                {(['left', 'right'] as const).map(side => (
+                                    <button
+                                        key={side}
+                                        onClick={() => setFormationSide(side)}
+                                        className={cn(
+                                            "px-2 py-0.5 rounded text-[10px] font-medium transition-all capitalize",
+                                            formationSide === side ? "bg-blue-600 text-white" : "text-slate-500 hover:text-slate-300"
+                                        )}
+                                    >
+                                        {side}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                            {FORMATIONS.map(formation => (
+                                <button
+                                    key={formation}
+                                    onClick={() => onSetFormation(formation, formationSide)}
+                                    className="bg-slate-800 hover:bg-slate-700 py-1.5 px-2 rounded text-[10px] text-slate-300 border border-slate-700"
+                                >
+                                    {FORMATION_NAMES[formation]}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 )}

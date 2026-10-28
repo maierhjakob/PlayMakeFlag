@@ -14,16 +14,29 @@ const TIGHT_YARDS = 3;
 const DOUBLE_YARDS = 3;
 
 // In folder order
-const FORMATIONS = ['spread', 'twins', 'trips', 'tight', 'double', 'overload'] as const;
-type Formation = typeof FORMATIONS[number];
+export const FORMATIONS = ['spread', 'twins', 'trips', 'tight', 'double', 'overload'] as const;
+export type Formation = typeof FORMATIONS[number];
 
-const FORMATION_NAMES: Record<Formation, string> = {
+export const FORMATION_NAMES: Record<Formation, string> = {
     spread: 'Spread',
     twins: 'Twins',
     trips: 'Trips',
     tight: 'Tight',
     double: 'Double',
     overload: 'Overload',
+};
+
+/**
+ * Receiver alignments (yards from the center, left to right) for each formation, strong side right.
+ * Each one is detected as its own formation by detectFormation; mirror the x for strong side left.
+ */
+export const FORMATION_ALIGNMENTS: Record<Formation, number[]> = {
+    spread: [-10, 5, 10],
+    twins: [-10, 2, 10],
+    trips: [-2, 2, 10],
+    tight: [-3, 1.5, 3],
+    double: [-10, 7, 10],
+    overload: [4, 7, 10],
 };
 
 /** Formation from where the receivers stand after motion, relative to the center. */
