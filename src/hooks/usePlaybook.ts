@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag, SavedRoute } from '@/types';
-import { buildDepthFolders, countPlayersOver10, depthFolderId } from '@/lib/depthFolders';
+import { buildPlayFolders, playFolderId } from '@/lib/playFolders';
 import { POSITIONS, getPos, clampPoint, FIELD_PIXEL_WIDTH } from '@/lib/constants';
 import { generateRoutePoints } from '@/lib/routes';
 import type { RoutePreset } from '@/lib/routes';
@@ -87,7 +87,7 @@ function loadPlaybooks(): Playbook[] {
 // ============================================
 
 function loadCollapsedFolderIds(): Set<string> {
-    const saved = localStorage.getItem('collapsed_depth_folders');
+    const saved = localStorage.getItem('collapsed_play_folders');
     return new Set(saved ? JSON.parse(saved) : []);
 }
 
@@ -127,13 +127,13 @@ export function usePlaybook() {
 
     // All global plays, with grid positions from the current playbook merged in.
     // A play's gridPosition is per-playbook — only set if it's been assigned to a cell here.
-    // Folders are derived from the routes: one per number of players going past the 10 yard line.
+    // Folders are derived from the plays: formation folders, each split by players going past the 10 yard line.
     const plays: Play[] = globalPlays.map(play => {
         const entry = currentPlaybook?.entries.find(e => e.playId === play.id);
-        const folderId = depthFolderId(countPlayersOver10(play));
+        const folderId = playFolderId(play);
         return { ...play, folderId, gridPosition: entry?.gridPosition };
     });
-    const folders = buildDepthFolders(globalPlays.map(countPlayersOver10), collapsedFolderIds);
+    const folders = buildPlayFolders(globalPlays, collapsedFolderIds);
 
     const currentPlay = globalPlays.find(p => p.id === currentPlayId) || null;
     const selectedPlayer = currentPlay?.players.find(p => p.id === selectedPlayerId) || null;
@@ -153,7 +153,7 @@ export function usePlaybook() {
     }, [currentPlaybookId]);
 
     useEffect(() => {
-        localStorage.setItem('collapsed_depth_folders', JSON.stringify([...collapsedFolderIds]));
+        localStorage.setItem('collapsed_play_folders', JSON.stringify([...collapsedFolderIds]));
     }, [collapsedFolderIds]);
 
     useEffect(() => {

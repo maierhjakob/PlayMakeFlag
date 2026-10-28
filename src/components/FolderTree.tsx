@@ -112,10 +112,17 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
         setDraggedPlayId(null);
     };
 
-    const sortedFolders = [...folders].sort((a, b) => a.order - b.order);
+    // Formation folders on top, depth sub-folders inside; plays live in the sub-folders
+    const topFolders = folders.filter(f => !f.parentId).sort((a, b) => a.order - b.order);
+
+    const subFolders = (parentId: string) =>
+        folders.filter(f => f.parentId === parentId).sort((a, b) => a.order - b.order);
 
     const playsInFolder = (folderId: string) =>
         plays.filter(p => p.folderId === folderId);
+
+    const playCount = (folder: PlayFolder) =>
+        playsInFolder(folder.id).length + subFolders(folder.id).reduce((sum, sub) => sum + playsInFolder(sub.id).length, 0);
 
     // Stack index → pixel offset for a folder that has scrolled past the top
     const stickyTop = (folderId: string): number => {
@@ -123,11 +130,17 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
         return idx === -1 ? 0 : idx * FOLDER_HEADER_H;
     };
 
-    const renderFolderHeader = (folder: PlayFolder, topPx?: number) => (
+    const renderFolderHeader = (folder: PlayFolder, isSubFolder: boolean, topPx?: number) => (
         <div
             key={folder.id}
-            className="flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-slate-800/50 sticky z-10 bg-slate-900 cursor-pointer select-none"
-            style={{ top: topPx !== undefined ? `${topPx}px` : undefined }}
+            className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded transition-colors hover:bg-slate-800/50 cursor-pointer select-none",
+                isSubFolder ? "bg-slate-900/90" : "sticky z-10 bg-slate-900"
+            )}
+            style={{
+                paddingLeft: isSubFolder ? '20px' : '8px',
+                top: topPx !== undefined ? `${topPx}px` : undefined,
+            }}
             onClick={() => onToggleFolder(folder.id)}
         >
             <span className="text-slate-500 shrink-0">
@@ -136,11 +149,11 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                     : <ChevronRight size={12} />
                 }
             </span>
-            <span className="flex-1 text-xs text-slate-300 font-medium truncate">
+            <span className={cn("flex-1 text-xs truncate", isSubFolder ? "text-slate-400" : "text-slate-300 font-medium")}>
                 {folder.name}
             </span>
             <span className="text-[10px] text-slate-600 shrink-0">
-                {playsInFolder(folder.id).length}
+                {playCount(folder)}
             </span>
         </div>
     );
@@ -155,25 +168,30 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                 <div className="px-2 py-1 text-[10px] text-slate-600">No plays yet</div>
             )}
 
-            {sortedFolders.map(folder => (
+            {topFolders.map(folder => (
                 <div key={folder.id}>
                     {/* Sentinel: zero-height marker at the folder's natural position.
                         Used by handleScroll to detect when this folder has scrolled past the top. */}
                     <div ref={el => { sentinelRefs.current[folder.id] = el; }} style={{ height: 0 }} />
 
-                    {renderFolderHeader(folder, stickyTop(folder.id))}
+                    {renderFolderHeader(folder, false, stickyTop(folder.id))}
 
-                    {folder.isExpanded && playsInFolder(folder.id).map(play => (
-                        <PlayRow
-                            key={play.id}
-                            play={play}
-                            isSelected={currentPlayId === play.id}
-                            indent={28}
-                            onSelect={onSelectPlay}
-                            onDragStart={setDraggedPlayId}
-                            onDrop={handleDropOnPlay}
-                            isDragging={draggedPlayId === play.id}
-                        />
+                    {folder.isExpanded && subFolders(folder.id).map(sub => (
+                        <div key={sub.id}>
+                            {renderFolderHeader(sub, true)}
+                            {sub.isExpanded && playsInFolder(sub.id).map(play => (
+                                <PlayRow
+                                    key={play.id}
+                                    play={play}
+                                    isSelected={currentPlayId === play.id}
+                                    indent={36}
+                                    onSelect={onSelectPlay}
+                                    onDragStart={setDraggedPlayId}
+                                    onDrop={handleDropOnPlay}
+                                    isDragging={draggedPlayId === play.id}
+                                />
+                            ))}
+                        </div>
                     ))}
                 </div>
             ))}
