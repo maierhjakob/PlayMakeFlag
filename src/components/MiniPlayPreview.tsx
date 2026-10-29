@@ -14,6 +14,8 @@ interface MiniPlayPreviewProps {
     showDefense?: boolean;
     /** Field depth shown above the bottom edge, in yards. Scales the height on its own; by default the height scales like the width */
     depthYards?: number;
+    /** Line width of option, check and endzone routes relative to primary routes */
+    secondaryRouteScale?: number;
     className?: string;
 }
 
@@ -28,7 +30,8 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
     className = '',
     yardNumbersOutside = false,
     showDefense = false,
-    depthYards
+    depthYards,
+    secondaryRouteScale = 1
 }) => {
     // Field dimensions (25 yards wide @ 25px/yard)
     const VIRTUAL_WIDTH = 625;
@@ -158,6 +161,7 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
                 const secondLast = route.points[route.points.length - 2];
 
                 let arrowhead = null;
+                const routeStroke = route.type === 'primary' ? strokeWidth : strokeWidth * secondaryRouteScale;
                 const routeColor = route.type === 'check' ? '#000000' :
                     route.type === 'endzone' ? '#f472b6' : offenseColor(player.color);
 
@@ -172,19 +176,19 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
                     const angle = Math.atan2(dy, dx) * (180 / Math.PI);
                     const length = Math.sqrt(dx * dx + dy * dy);
 
-                    const arrowPush = strokeWidth * 1.25;
+                    const arrowPush = routeStroke * 1.25;
                     const ux = dx / length;
                     const uy = dy / length;
                     const tipX = lpx + (ux * arrowPush);
                     const tipY = lpy + (uy * arrowPush);
 
-                    const arrowSize = strokeWidth * 2.5;
+                    const arrowSize = routeStroke * 2.5;
                     arrowhead = (
                         <path
                             d={`M -${arrowSize} -${arrowSize / 2} L 0 0 L -${arrowSize} ${arrowSize / 2} L -${arrowSize * 0.55} 0 Z`}
                             fill={route.type === 'option' ? 'white' : routeColor}
                             stroke={routeColor}
-                            strokeWidth={strokeWidth * 0.66}
+                            strokeWidth={routeStroke * 0.66}
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             transform={`translate(${tipX}, ${tipY}) rotate(${angle})`}
@@ -196,15 +200,15 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
                     .map((point, idx) => idx === 0 ? `M ${getX(point.x)} ${getY(point.y)}` : `L ${getX(point.x)} ${getY(point.y)}`)
                     .join(' ');
 
-                const strokeDasharray = route.type === 'option' ? `${strokeWidth * 1},${strokeWidth * 2}` :
-                    route.type === 'endzone' ? `${strokeWidth * 1.5},${strokeWidth * 2.5}` : 'none';
+                const strokeDasharray = route.type === 'option' ? `${routeStroke * 1},${routeStroke * 2}` :
+                    route.type === 'endzone' ? `${routeStroke * 1.5},${routeStroke * 2.5}` : 'none';
 
                 return (
                     <g key={route.id}>
                         <path
                             d={pathData}
                             stroke={routeColor}
-                            strokeWidth={strokeWidth}
+                            strokeWidth={routeStroke}
                             fill="none"
                             opacity={route.type === 'check' ? 0.7 : 1}
                             strokeDasharray={strokeDasharray}

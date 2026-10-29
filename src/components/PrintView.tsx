@@ -69,6 +69,7 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerP
                                                         width={PREVIEW_WIDTH}
                                                         height={previewHeight}
                                                         strokeWidth={2.5}
+                                                        secondaryRouteScale={0.8}
                                                         depthYards={depthYards}
                                                         className="print-mini-preview"
                                                         yardNumbersOutside
