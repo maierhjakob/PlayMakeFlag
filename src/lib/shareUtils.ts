@@ -59,7 +59,8 @@ const minifyPlay = (p: Play): any => {
         p.ballPosition ? minifyPoint(p.ballPosition) : null,
         // Added later as optional last elements, so older versions simply ignore them
         p.defense ? minifyDefense(p.defense) : null,
-        p.comment || null
+        p.comment || null,
+        p.updatedAt || null
     ];
 };
 
@@ -142,6 +143,7 @@ const unminifyPlay = (data: any): Play => {
         ballPosition: data[5] ? unminifyPoint(data[5]) : undefined,
         defense: data[6] ? unminifyDefense(data[6]) : undefined,
         comment: data[7] || undefined,
+        updatedAt: data[8] || undefined,
     };
 };
 
@@ -173,6 +175,10 @@ const unminifyTag = (data: any): PlayTag => {
         color: data[2],
     };
 };
+
+/** The play's content as it would be shared, without grid position and change time: equal for the same play. */
+export const playFingerprint = (p: Play): string =>
+    JSON.stringify(minifyPlay({ ...p, gridPosition: undefined, updatedAt: undefined }));
 
 export const isMinified = (data: any): boolean => {
     return Array.isArray(data) && data[0] === 3;

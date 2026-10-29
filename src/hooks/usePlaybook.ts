@@ -1,10 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Playbook, PlaybookEntry, Play, Player, Point, RouteSegment, RouteType, PlayTag, SavedRoute, PlayDefense } from '@/types';
 import { buildPlayFolders, playFolderId, FORMATION_ALIGNMENTS, type Formation } from '@/lib/playFolders';
 import { POSITIONS, getPos, clampPoint, FIELD_PIXEL_WIDTH, S } from '@/lib/constants';
 import { generateRoutePoints } from '@/lib/routes';
 import { applyCoverage, copyDefense, mirrorDefense } from '@/lib/defense';
 import type { RoutePreset } from '@/lib/routes';
+import { playFingerprint } from '@/lib/shareUtils';
+
+/** A play being imported that you already have (same id), but changed */
+export interface PlayConflict {
+    mine: Play;
+    theirs: Play;
+}
+
+export type ConflictChoice = 'mine' | 'theirs' | 'both';
 
 // ============================================
 // MIGRATION
@@ -174,7 +183,7 @@ export function usePlaybook() {
     /** Updates the play in global storage. Strips any transient gridPosition. */
     const updateCurrentPlay = (updatedPlay: Play) => {
         const { gridPosition: _gp, ...globalPlay } = updatedPlay as Play & { gridPosition?: any };
-        setGlobalPlays(prev => prev.map(p => p.id === globalPlay.id ? globalPlay : p));
+        setGlobalPlays(prev => prev.map(p => p.id === globalPlay.id ? { ...globalPlay, updatedAt: Date.now() } : p));
     };
 
     // ============================================
@@ -264,7 +273,8 @@ export function usePlaybook() {
         const newPlay: Play = {
             id: crypto.randomUUID(),
             name: `Play ${globalPlays.length + 1}`,
-            players: defaultPlayers
+            players: defaultPlayers,
+            updatedAt: Date.now()
         };
 
         setGlobalPlays(prev => [...prev, newPlay]);
@@ -294,6 +304,7 @@ export function usePlaybook() {
             ...src,
             id: crypto.randomUUID(),
             name: `${src.name} (Mirror)`,
+            updatedAt: Date.now(),
             defense: src.defense ? copyDefense(mirrorDefense(src.defense, mx), playerIds) : undefined,
             players: src.players.map(player => ({
                 ...player,
@@ -321,6 +332,7 @@ export function usePlaybook() {
             ...playToCopy,
             id: crypto.randomUUID(),
             name: `${playToCopy.name} (Copy)`,
+            updatedAt: Date.now(),
             defense: playToCopy.defense ? copyDefense(playToCopy.defense, playerIds) : undefined,
             players: playToCopy.players.map(player => ({
                 ...player,
@@ -341,15 +353,15 @@ export function usePlaybook() {
     };
 
     const handleUpdatePlayName = (id: string, name: string) => {
-        setGlobalPlays(prev => prev.map(p => p.id === id ? { ...p, name } : p));
+        setGlobalPlays(prev => prev.map(p => p.id === id ? { ...p, name, updatedAt: Date.now() } : p));
     };
 
     const handleUpdatePlayTags = (id: string, tags: PlayTag[]) => {
-        setGlobalPlays(prev => prev.map(p => p.id === id ? { ...p, tags } : p));
+        setGlobalPlays(prev => prev.map(p => p.id === id ? { ...p, tags, updatedAt: Date.now() } : p));
     };
 
     const handleUpdatePlayComment = (id: string, comment: string) => {
-        setGlobalPlays(prev => prev.map(p => p.id === id ? { ...p, comment: comment || undefined } : p));
+        setGlobalPlays(prev => prev.map(p => p.id === id ? { ...p, comment: comment || undefined, updatedAt: Date.now() } : p));
     };
 
     // ============================================
@@ -636,56 +648,74 @@ export function usePlaybook() {
     // IMPORT / EXPORT
     // ============================================
 
+    // Imported plays that differ from yours, waiting for you to choose a version
+    const [importConflicts, setImportConflicts] = useState<{ conflicts: PlayConflict[]; playbookIds: string[] } | null>(null);
+
+    // The import runs from listeners set up once, so it reads the current plays through a ref
+    const globalPlaysRef = useRef(globalPlays);
+    useEffect(() => {
+        globalPlaysRef.current = globalPlays;
+    }, [globalPlays]);
+
     const handleImportData = useCallback((data: string) => {
         try {
             const imported = JSON.parse(data);
 
-            const importPlaybook = (pb: any) => {
-                const newId = crypto.randomUUID();
-
-                // Extract plays into global store
-                const incomingPlays: Play[] = (pb.plays || []).map((p: any) => {
-                    const { gridPosition: _gp, ...globalPlay } = p;
-                    return { ...globalPlay, id: p.id || crypto.randomUUID() };
-                });
-
-                const entries: PlaybookEntry[] = (pb.plays || []).map((p: any) => ({
-                    playId: p.id,
-                    ...(p.gridPosition ? { gridPosition: p.gridPosition } : {})
-                }));
-
-                setGlobalPlays(prev => {
-                    const existingIds = new Set(prev.map(p => p.id));
-                    return [...prev, ...incomingPlays.filter(p => !existingIds.has(p.id))];
-                });
-
-                const newPlaybook: Playbook = {
-                    id: newId,
-                    name: pb.name || 'Imported Playbook',
-                    entries: pb.entries || entries,
-                    gridConfig: pb.gridConfig || { columnNames: ['A', 'B', 'C', 'D', 'E'] },
-                    createdAt: Date.now(),
-                    updatedAt: Date.now()
-                };
-                setPlaybooks(prev => [...prev, newPlaybook]);
-            };
-
+            // Normalize every supported shape into a list of playbooks with plays
+            let incomingPlaybooks: any[] = [];
             if (Array.isArray(imported)) {
                 if (imported.length === 0) return true;
                 const isPlaybookArray = 'plays' in imported[0] || 'entries' in imported[0];
-                if (isPlaybookArray) {
-                    imported.forEach(importPlaybook);
-                } else {
-                    // Array of plays — wrap in a playbook
-                    const fakePlaybook = { name: 'Imported Plays', plays: imported };
-                    importPlaybook(fakePlaybook);
-                }
+                // An array of plays gets wrapped in a playbook
+                incomingPlaybooks = isPlaybookArray ? imported : [{ name: 'Imported Plays', plays: imported }];
             } else if (typeof imported === 'object' && imported !== null) {
                 if ('plays' in imported || 'entries' in imported) {
-                    importPlaybook(imported);
+                    incomingPlaybooks = [imported];
                 } else if ('players' in imported) {
-                    importPlaybook({ name: imported.name || 'Imported Play', plays: [imported] });
+                    incomingPlaybooks = [{ name: imported.name || 'Imported Play', plays: [imported] }];
                 }
+            }
+
+            // Plays of all playbooks, once each (a backup carries the same plays for every playbook)
+            const incomingPlays = new Map<string, Play>();
+            incomingPlaybooks.forEach(pb => (pb.plays || []).forEach((p: any) => {
+                if (!p.id) p.id = crypto.randomUUID();
+                const { gridPosition: _gp, ...globalPlay } = p;
+                if (!incomingPlays.has(p.id)) incomingPlays.set(p.id, globalPlay);
+            }));
+
+            // New plays are added; plays you have with the same content are skipped; changed ones are conflicts
+            const existing = new Map(globalPlaysRef.current.map(p => [p.id, p]));
+            const newPlays: Play[] = [];
+            const conflicts: PlayConflict[] = [];
+            incomingPlays.forEach(theirs => {
+                const mine = existing.get(theirs.id);
+                if (!mine) newPlays.push(theirs);
+                else if (playFingerprint(mine) !== playFingerprint(theirs)) conflicts.push({ mine, theirs });
+            });
+            setGlobalPlays(prev => {
+                const ids = new Set(prev.map(p => p.id));
+                return [...prev, ...newPlays.filter(p => !ids.has(p.id))];
+            });
+
+            const newPlaybooks: Playbook[] = incomingPlaybooks.map(pb => ({
+                id: crypto.randomUUID(),
+                name: pb.name || 'Imported Playbook',
+                entries: pb.entries || (pb.plays || []).map((p: any) => ({
+                    playId: p.id,
+                    ...(p.gridPosition ? { gridPosition: p.gridPosition } : {})
+                })),
+                gridConfig: pb.gridConfig || { columnNames: ['A', 'B', 'C', 'D', 'E'] },
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+            }));
+            setPlaybooks(prev => [...prev, ...newPlaybooks]);
+
+            if (conflicts.length > 0) {
+                setImportConflicts(prev => ({
+                    conflicts: [...(prev?.conflicts || []), ...conflicts],
+                    playbookIds: [...(prev?.playbookIds || []), ...newPlaybooks.map(pb => pb.id)],
+                }));
             }
             return true;
         } catch (error) {
@@ -694,6 +724,32 @@ export function usePlaybook() {
             return false;
         }
     }, []);
+
+    /**
+     * Apply the chosen version of each conflicting play: keep yours, take the imported one, or keep both.
+     * With both, the imported version becomes a new play that the imported playbooks' grids point to.
+     */
+    const resolveImportConflicts = (choices: Record<string, ConflictChoice>) => {
+        if (!importConflicts) return;
+        // New ids for the imported versions kept next to yours
+        const copyIds = new Map(importConflicts.conflicts
+            .filter(c => choices[c.mine.id] === 'both')
+            .map(c => [c.mine.id, crypto.randomUUID()]));
+        setGlobalPlays(prev => prev.flatMap(p => {
+            const conflict = importConflicts.conflicts.find(c => c.mine.id === p.id);
+            const choice = choices[p.id] || 'mine';
+            if (!conflict || choice === 'mine') return [p];
+            if (choice === 'theirs') return [conflict.theirs];
+            return [p, { ...conflict.theirs, id: copyIds.get(p.id)!, name: `${conflict.theirs.name} (imported)` }];
+        }));
+        if (copyIds.size > 0) {
+            setPlaybooks(prev => prev.map(pb => importConflicts.playbookIds.includes(pb.id)
+                ? { ...pb, entries: pb.entries.map(e => copyIds.has(e.playId) ? { ...e, playId: copyIds.get(e.playId)! } : e) }
+                : pb
+            ));
+        }
+        setImportConflicts(null);
+    };
 
     const handleImportPlaybook = (file: File) => {
         const reader = new FileReader();
@@ -836,6 +892,8 @@ export function usePlaybook() {
         // Import/Export
         handleImportPlaybook,
         handleImportData,
+        importConflicts,
+        resolveImportConflicts,
 
         // Undo/Redo
         pushToUndoStack,

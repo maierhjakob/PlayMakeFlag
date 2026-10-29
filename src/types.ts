@@ -65,6 +65,8 @@ export interface Play {
     name: string;
     /** Extra note on the play, shown in the PNG export (not printed) */
     comment?: string;
+    /** When the play was last changed (ms), to tell versions apart when importing a play that already exists */
+    updatedAt?: number;
     players: Player[];
     // gridPosition is NOT stored on Play — it lives in PlaybookEntry.
     // It may be attached at read-time for component convenience.

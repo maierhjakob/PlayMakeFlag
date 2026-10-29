@@ -11,6 +11,7 @@ import { DefenderToken } from '@/components/DefenderToken'
 import { PrintModal, type PrintSettings } from '@/components/PrintModal'
 import { ShareModal } from '@/components/ShareModal'
 import { CommentModal } from '@/components/CommentModal'
+import { MergeModal } from '@/components/MergeModal'
 import { PrintView } from '@/components/PrintView'
 import type { Point, RouteType, RouteSegment, Coverage, Defender, Playbook } from '@/types'
 import { usePlaybook } from '@/hooks/usePlaybook'
@@ -92,6 +93,8 @@ function App() {
     handleAssignPlayToCell,
     handleRemovePlayFromCell,
     handleImportData,
+    importConflicts,
+    resolveImportConflicts,
     // Saved routes
     savedRoutes,
     handleSaveRoute,
@@ -381,18 +384,6 @@ function App() {
     } catch (e) {
       console.error("Export failed", e);
       alert("Failed to generate sharing file.");
-    }
-  };
-
-  const handleSavePlaybook = async () => {
-    try {
-      if (!currentPlaybook) return;
-      const file = await createPlaybookFile(currentPlaybook);
-      const location = await saveFile(file);
-      alert(`Playbook saved to ${location}. Open the file to load it back into the app.`);
-    } catch (e) {
-      console.error("Save failed", e);
-      alert("Failed to save the playbook file.");
     }
   };
 
@@ -1297,7 +1288,6 @@ function App() {
           }}
           onOpenPrintSettings={() => setIsPrintModalOpen(true)}
           onExportPlaybook={() => setIsShareModalOpen(true)}
-          onSavePlaybook={handleSavePlaybook}
           onBackupAll={handleBackupAll}
           lastBackupAt={lastBackupAt}
         />
@@ -1352,6 +1342,9 @@ function App() {
       </nav>
 
       {/* Modals & Print Layers */}
+      {importConflicts && (
+        <MergeModal conflicts={importConflicts.conflicts} onResolve={resolveImportConflicts} />
+      )}
       {isCommentModalOpen && currentPlay && (
         <CommentModal
           playName={currentPlay.name}
