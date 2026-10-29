@@ -49,22 +49,22 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onPrint
 
                 <div className="p-6 space-y-6">
                     <div className="space-y-3">
-                        <label className="text-sm font-medium text-slate-300">Quantity (Grids per Page)</label>
+                        <label className="text-sm font-medium text-slate-300">Playbooks per Page</label>
                         <select
                             value={playsPerPage}
                             onChange={(e) => setPlaysPerPage(Number(e.target.value))}
                             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                         >
-                            <option value={1}>1 Grid per page</option>
-                            <option value={2}>2 Grids per page</option>
-                            <option value={4}>4 Grids per page</option>
-                            <option value={6}>6 Grids per page</option>
+                            <option value={1}>1 playbook per page</option>
+                            <option value={2}>2 playbooks per page</option>
+                            <option value={4}>4 playbooks per page</option>
+                            <option value={6}>6 playbooks per page</option>
                         </select>
-                        <p className="text-[10px] text-slate-500 italic">This determines how many grid cards are printed on one A4 side.</p>
+                        <p className="text-[10px] text-slate-500 italic">This determines how many playbooks are printed on one A4 side.</p>
                     </div>
 
                     <div className="space-y-3">
-                        <label className="text-sm font-medium text-slate-300">Card Height (cm)</label>
+                        <label className="text-sm font-medium text-slate-300">Playbook Height (cm)</label>
                         <div className="flex items-center gap-3">
                             <input
                                 type="range"
@@ -98,7 +98,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onPrint
                     <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700 text-xs text-slate-400 space-y-2">
                         <p className="font-semibold text-slate-300 uppercase text-[10px]">Important:</p>
                         <ul className="list-disc pl-4 space-y-1">
-                            <li>Grids will be printed at <strong>11.5cm x {cardHeight}cm</strong>.</li>
+                            <li>Each playbook is printed at <strong>11.5cm x {cardHeight}cm</strong>.</li>
                             <li>Play names are hidden to maximize space for play diagrams.</li>
                             <li>Make sure to enable <strong>"Background Graphics"</strong> in your browser's print dialog.</li>
                         </ul>
