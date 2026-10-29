@@ -16,7 +16,11 @@ interface PlaybookGridProps {
     onOpenPrintSettings: () => void;
     onExportPlaybook: () => void;
     onBackupAll: () => void;
+    /** Only where the browser can save to a chosen file */
+    onChangeBackupLocation?: () => void;
     lastBackupAt: number | null;
+    /** The file backups overwrite, once chosen */
+    backupFileName: string | null;
 
     // Grid management
     plays: Play[];
@@ -54,7 +58,9 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     onOpenPrintSettings,
     onExportPlaybook,
     onBackupAll,
+    onChangeBackupLocation,
     lastBackupAt,
+    backupFileName,
     className,
     style
 }) => {
@@ -203,17 +209,28 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                     )}
 
                     {/* Backup of all playbooks */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <button
                             onClick={onBackupAll}
                             className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-emerald-400 py-1.5 px-2 rounded text-xs font-medium border border-slate-700 transition-all flex items-center justify-center gap-1"
-                            title="Save all playbooks into one backup file on this device"
+                            title={backupFileName && onChangeBackupLocation
+                                ? `Save all playbooks, overwriting ${backupFileName}`
+                                : "Save all playbooks into one backup file on this device"}
                         >
                             <Archive size={12} /> Back up all playbooks
                         </button>
                         <span className="text-[10px] text-slate-500">
                             {lastBackupAt ? `Last backup: ${formatSavedAt(lastBackupAt)}` : 'No backup yet'}
+                            {backupFileName && onChangeBackupLocation && ` · ${backupFileName}`}
                         </span>
+                        {backupFileName && onChangeBackupLocation && (
+                            <button
+                                onClick={onChangeBackupLocation}
+                                className="text-[10px] text-emerald-400 hover:text-emerald-300 underline"
+                            >
+                                Change location
+                            </button>
+                        )}
                     </div>
                 </div>
 

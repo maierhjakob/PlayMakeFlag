@@ -37,6 +37,7 @@ import { ImageDown, MessageSquare, Shield } from 'lucide-react'
 import { App as NativeApp } from '@capacitor/app'
 import { saveFile, shareFile } from '@/lib/shareFile'
 import { renderPlayImage } from '@/lib/playImage'
+import { canPickBackupLocation, getBackupLocation, pickBackupLocation, writeBackup } from '@/lib/backupLocation'
 
 const FIELD_PX = 625;
 // Padding around the field column in the center pane on desktop (md:p-8)
@@ -389,15 +390,39 @@ function App() {
 
   const [lastBackupAt, setLastBackupAt] = useState<number | null>(() => Number(localStorage.getItem('lastBackupAt')) || null);
 
-  const handleBackupAll = async () => {
+  // The file backups overwrite, where the browser lets you pick one (Chrome / Edge on desktop)
+  const [backupFileName, setBackupFileName] = useState<string | null>(() => localStorage.getItem('backupFileName'));
+
+  const handleBackupAll = async (changeLocation = false) => {
     try {
+      // Pick or unlock the backup file first: the picker and the permission prompt need the click
+      const handle = canPickBackupLocation
+        ? await (changeLocation || !backupFileName ? pickBackupLocation() : getBackupLocation())
+        : null;
+      if (canPickBackupLocation && !handle) return; // Cancelled
+
       const savedAt = Date.now();
       const file = await createPlaybooksFile(playbooks, `All playbooks (saved ${formatSavedAt(savedAt)})`, `PlayMakerFlag_Backup_${fileStampSavedAt(savedAt)}.html`, savedAt);
-      const location = await saveFile(file);
+      let location: string;
+      if (handle) {
+        await writeBackup(handle, file);
+        localStorage.setItem('backupFileName', handle.name);
+        setBackupFileName(handle.name);
+        location = `"${handle.name}"`;
+      } else {
+        location = await saveFile(file);
+      }
       localStorage.setItem('lastBackupAt', String(savedAt));
       setLastBackupAt(savedAt);
       alert(`Backup of ${playbooks.length} playbook(s) saved to ${location}. Open the file to restore it.`);
     } catch (e) {
+      // The remembered file was moved or deleted
+      if (e instanceof DOMException && e.name === 'NotFoundError') {
+        localStorage.removeItem('backupFileName');
+        setBackupFileName(null);
+        alert("The backup file was moved or deleted. Click the backup button again to choose where to save it.");
+        return;
+      }
       console.error("Backup failed", e);
       alert("Failed to save the backup file.");
     }
@@ -1288,7 +1313,9 @@ function App() {
           }}
           onOpenPrintSettings={() => setIsPrintModalOpen(true)}
           onExportPlaybook={() => setIsShareModalOpen(true)}
-          onBackupAll={handleBackupAll}
+          onBackupAll={() => handleBackupAll()}
+          onChangeBackupLocation={canPickBackupLocation ? () => handleBackupAll(true) : undefined}
+          backupFileName={backupFileName}
           lastBackupAt={lastBackupAt}
         />
       </main>
