@@ -6,9 +6,10 @@ interface PrintViewProps {
     playbook: Playbook;
     plays: Play[];
     playsPerPage: number;
+    cardHeight: number; // cm
 }
 
-export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerPage }) => {
+export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerPage, cardHeight }) => {
     const ROWS = 4;
     const COLS = playbook.gridConfig.columnNames.length;
 
@@ -16,7 +17,7 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerP
     // so narrower cells show more field depth instead of shrinking the play
     const PREVIEW_WIDTH = 120;
     const cellWidth = ((11.5 - 0.5) / COLS - 0.3) * 0.95; // card - row number column, minus tag column + padding
-    const cellHeight = ((6.33 - 0.4) / ROWS) * 0.98;     // card - header row
+    const cellHeight = ((cardHeight - 0.4) / ROWS) * 0.98;     // card - header row
     const previewHeight = Math.round(PREVIEW_WIDTH * (1 + YARD_NUMBER_MARGIN) * cellHeight / cellWidth);
 
     // Every column count shows the same field depth, so narrow cells don't get extra empty field on top:
@@ -121,7 +122,7 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerP
 
                     .print-card {
                         width: 11.5cm;
-                        height: 6.33cm;
+                        height: ${cardHeight}cm;
                         border: 1px solid black;
                         background: white;
                         display: flex;

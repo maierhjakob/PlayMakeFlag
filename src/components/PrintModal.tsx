@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Printer } from 'lucide-react';
+import { CARD_HEIGHT_KEY, DEFAULT_CARD_HEIGHT, MAX_CARD_HEIGHT, MIN_CARD_HEIGHT, clampHeight, loadCardHeight } from '@/lib/printSettings';
 
 interface PrintModalProps {
     isOpen: boolean;
@@ -9,10 +10,27 @@ interface PrintModalProps {
 
 export interface PrintSettings {
     playsPerPage: number;
+    cardHeight: number; // cm
 }
 
 export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onPrint }) => {
     const [playsPerPage, setPlaysPerPage] = useState(4);
+    const [cardHeight, setCardHeight] = useState(loadCardHeight);
+    // Typed text, so the field can be cleared or half-typed without jumping
+    const [heightInput, setHeightInput] = useState(() => String(loadCardHeight()));
+
+    const applyHeight = (value: number) => {
+        const height = clampHeight(value);
+        setCardHeight(height);
+        setHeightInput(String(height));
+    };
+
+    const handlePrint = () => {
+        const height = clampHeight(parseFloat(heightInput.replace(',', '.')));
+        applyHeight(height);
+        try { localStorage.setItem(CARD_HEIGHT_KEY, String(height)); } catch { /* not remembered */ }
+        onPrint({ playsPerPage, cardHeight: height });
+    };
 
     if (!isOpen) return null;
 
@@ -42,13 +60,45 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onPrint
                             <option value={4}>4 Grids per page</option>
                             <option value={6}>6 Grids per page</option>
                         </select>
-                        <p className="text-[10px] text-slate-500 italic">This will determines how many 11x6cm grid cards are printed on one A4 side.</p>
+                        <p className="text-[10px] text-slate-500 italic">This determines how many grid cards are printed on one A4 side.</p>
+                    </div>
+
+                    <div className="space-y-3">
+                        <label className="text-sm font-medium text-slate-300">Card Height (cm)</label>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="range"
+                                min={MIN_CARD_HEIGHT}
+                                max={MAX_CARD_HEIGHT}
+                                step={0.1}
+                                value={cardHeight}
+                                onChange={(e) => applyHeight(Number(e.target.value))}
+                                className="flex-1 accent-emerald-500"
+                            />
+                            <input
+                                type="text"
+                                inputMode="decimal"
+                                value={heightInput}
+                                onChange={(e) => setHeightInput(e.target.value)}
+                                onBlur={() => applyHeight(parseFloat(heightInput.replace(',', '.')))}
+                                onKeyDown={(e) => e.key === 'Enter' && applyHeight(parseFloat(heightInput.replace(',', '.')))}
+                                className="w-16 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-white text-center focus:outline-none focus:border-emerald-500"
+                            />
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-500">
+                            <span>{MIN_CARD_HEIGHT}–{MAX_CARD_HEIGHT} cm, width stays 11.5 cm</span>
+                            {cardHeight !== DEFAULT_CARD_HEIGHT && (
+                                <button onClick={() => applyHeight(DEFAULT_CARD_HEIGHT)} className="text-emerald-400 hover:text-emerald-300">
+                                    Reset to {DEFAULT_CARD_HEIGHT} cm
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700 text-xs text-slate-400 space-y-2">
                         <p className="font-semibold text-slate-300 uppercase text-[10px]">Important:</p>
                         <ul className="list-disc pl-4 space-y-1">
-                            <li>Grids will be printed at <strong>11cm x 6cm</strong>.</li>
+                            <li>Grids will be printed at <strong>11.5cm x {cardHeight}cm</strong>.</li>
                             <li>Play names are hidden to maximize space for play diagrams.</li>
                             <li>Make sure to enable <strong>"Background Graphics"</strong> in your browser's print dialog.</li>
                         </ul>
@@ -63,7 +113,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onPrint
                         Cancel
                     </button>
                     <button
-                        onClick={() => onPrint({ playsPerPage })}
+                        onClick={handlePrint}
                         className="flex-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow-lg shadow-emerald-900/20 transition-all flex items-center justify-center gap-2"
                     >
                         <Printer size={18} />

@@ -9,6 +9,7 @@ import { DefenseControls } from '@/components/DefenseControls'
 import { DefenseLayer } from '@/components/DefenseLayer'
 import { DefenderToken } from '@/components/DefenderToken'
 import { PrintModal, type PrintSettings } from '@/components/PrintModal'
+import { loadCardHeight } from '@/lib/printSettings'
 import { ShareModal } from '@/components/ShareModal'
 import { CommentModal } from '@/components/CommentModal'
 import { MergeModal } from '@/components/MergeModal'
@@ -169,7 +170,7 @@ function App() {
 
   // Print state
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printSettings, setPrintSettings] = useState<PrintSettings>({ playsPerPage: 4 });
+  const [printSettings, setPrintSettings] = useState<PrintSettings>(() => ({ playsPerPage: 4, cardHeight: loadCardHeight() }));
 
   const handlePrint = (settings: PrintSettings) => {
     setPrintSettings(settings);
@@ -1402,6 +1403,7 @@ function App() {
           playbook={currentPlaybook}
           plays={plays}
           playsPerPage={printSettings.playsPerPage}
+          cardHeight={printSettings.cardHeight}
         />
       )}
     </div>
