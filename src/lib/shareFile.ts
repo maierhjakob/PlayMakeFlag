@@ -4,7 +4,8 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 
 interface ShareFileOptions {
     title: string;
-    text: string;
+    /** Sent along with the file; share targets like Copy treat it as a second item */
+    text?: string;
 }
 
 const toBase64 = async (file: File) => {
@@ -17,8 +18,9 @@ const toBase64 = async (file: File) => {
 };
 
 /**
- * Hand a file to the system share sheet: the native one in the app, the Web Share API in browsers that
- * support sharing files, otherwise download it. Returns 'downloaded' when it fell back to a download.
+ * Hand a file to the system share sheet: the native one in the app, the Web Share API in phone browsers
+ * that support sharing files, otherwise download it. Desktop browsers download: Chrome's share menu on macOS
+ * saved the file twice. Returns 'downloaded' when it fell back to a download.
  */
 export const shareFile = async (file: File, { title, text }: ShareFileOptions): Promise<'shared' | 'downloaded'> => {
     if (Capacitor.isNativePlatform()) {
@@ -35,7 +37,8 @@ export const shareFile = async (file: File, { title, text }: ShareFileOptions): 
         return 'shared';
     }
 
-    if (navigator.canShare?.({ files: [file] })) {
+    const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+    if (isTouchDevice && navigator.canShare?.({ files: [file] })) {
         try {
             await navigator.share({ files: [file], title, text });
             return 'shared';

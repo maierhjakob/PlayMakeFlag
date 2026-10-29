@@ -348,6 +348,10 @@ export function usePlaybook() {
         setGlobalPlays(prev => prev.map(p => p.id === id ? { ...p, tags } : p));
     };
 
+    const handleUpdatePlayComment = (id: string, comment: string) => {
+        setGlobalPlays(prev => prev.map(p => p.id === id ? { ...p, comment: comment || undefined } : p));
+    };
+
     // ============================================
     // PLAYER MANAGEMENT
     // ============================================
@@ -811,6 +815,7 @@ export function usePlaybook() {
         handleMirrorPlay,
         handleUpdatePlayName,
         handleUpdatePlayTags,
+        handleUpdatePlayComment,
 
         // Player actions
         handleUpdatePlayer,

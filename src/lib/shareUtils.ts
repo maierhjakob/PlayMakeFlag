@@ -57,8 +57,9 @@ const minifyPlay = (p: Play): any => {
         p.tags?.map(minifyTag) || [],
         p.gridPosition ? [p.gridPosition.row, p.gridPosition.column] : null,
         p.ballPosition ? minifyPoint(p.ballPosition) : null,
-        // Added later as an optional last element, so older versions simply ignore it
-        p.defense ? minifyDefense(p.defense) : null
+        // Added later as optional last elements, so older versions simply ignore them
+        p.defense ? minifyDefense(p.defense) : null,
+        p.comment || null
     ];
 };
 
@@ -140,6 +141,7 @@ const unminifyPlay = (data: any): Play => {
         gridPosition: data[4] ? { row: data[4][0], column: data[4][1] } : undefined,
         ballPosition: data[5] ? unminifyPoint(data[5]) : undefined,
         defense: data[6] ? unminifyDefense(data[6]) : undefined,
+        comment: data[7] || undefined,
     };
 };
 

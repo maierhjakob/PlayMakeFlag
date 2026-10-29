@@ -10,6 +10,8 @@ const PIXEL_RATIO = 5;
 const PADDING = 48;
 const TITLE_FONT_SIZE = 56;
 const TAG_FONT_SIZE = 30;
+const COMMENT_FONT_SIZE = 32;
+const COMMENT_LINE_HEIGHT = 44;
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
 const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
@@ -19,8 +21,27 @@ const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, rejec
     img.src = src;
 });
 
+/** Break text into lines that fit maxWidth, keeping the line breaks the user typed. */
+const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] =>
+    text.split('\n').flatMap(paragraph => {
+        const lines: string[] = [];
+        let line = '';
+        for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+            const candidate = line ? `${line} ${word}` : word;
+            if (line && ctx.measureText(candidate).width > maxWidth) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = candidate;
+            }
+        }
+        lines.push(line);
+        return lines;
+    });
+
 /**
- * The play drawn as a PNG: name and tags on top, the field (25 × 25 yd, as in the previews) below.
+ * The play drawn as a PNG: name and tags on top, the field (25 × 25 yd, as in the previews) below,
+ * then the play's comment if it has one.
  * With showDefense the play's defense is drawn too.
  */
 export const renderPlayImage = async (play: Play, { showDefense = false } = {}): Promise<File> => {
@@ -36,9 +57,16 @@ export const renderPlayImage = async (play: Play, { showDefense = false } = {}):
     const headerHeight = TITLE_FONT_SIZE + 24 + tagRowHeight;
 
     const canvas = document.createElement('canvas');
-    canvas.width = fieldPx + 2 * PADDING;
-    canvas.height = PADDING + headerHeight + fieldPx + PADDING;
     const ctx = canvas.getContext('2d')!;
+
+    // Comment lines, wrapped to the field width (measured before sizing the canvas, which resets the font)
+    const comment = play.comment?.trim();
+    ctx.font = `${COMMENT_FONT_SIZE}px ${FONT}`;
+    const commentLines = comment ? wrapText(ctx, comment, fieldPx) : [];
+    const commentHeight = commentLines.length > 0 ? 32 + commentLines.length * COMMENT_LINE_HEIGHT : 0;
+
+    canvas.width = fieldPx + 2 * PADDING;
+    canvas.height = PADDING + headerHeight + fieldPx + commentHeight + PADDING;
 
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -78,6 +106,17 @@ export const renderPlayImage = async (play: Play, { showDefense = false } = {}):
     ctx.strokeStyle = '#cbd5e1';
     ctx.lineWidth = 3;
     ctx.strokeRect(PADDING, fieldY, fieldPx, fieldPx);
+
+    // Comment under the field, left-aligned
+    if (commentLines.length > 0) {
+        ctx.fillStyle = '#334155';
+        ctx.font = `${COMMENT_FONT_SIZE}px ${FONT}`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        commentLines.forEach((line, i) => {
+            ctx.fillText(line, PADDING, fieldY + fieldPx + 32 + i * COMMENT_LINE_HEIGHT);
+        });
+    }
 
     const blob = await new Promise<Blob>((resolve, reject) =>
         canvas.toBlob(b => (b ? resolve(b) : reject(new Error('PNG export failed'))), 'image/png')

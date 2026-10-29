@@ -9,8 +9,10 @@ import { DefenseControls } from '@/components/DefenseControls'
 import { DefenseLayer } from '@/components/DefenseLayer'
 import { DefenderToken } from '@/components/DefenderToken'
 import { PrintModal, type PrintSettings } from '@/components/PrintModal'
+import { ShareModal } from '@/components/ShareModal'
+import { CommentModal } from '@/components/CommentModal'
 import { PrintView } from '@/components/PrintView'
-import type { Point, RouteType, RouteSegment, Coverage, Defender } from '@/types'
+import type { Point, RouteType, RouteSegment, Coverage, Defender, Playbook } from '@/types'
 import { usePlaybook } from '@/hooks/usePlaybook'
 import { S, clampPoint } from '@/lib/constants'
 import { applyCoverage, completeDefense, defenderColor, DEFENDER_COUNT, NEUTRAL_OFFENSE_COLOR } from '@/lib/defense'
@@ -30,7 +32,7 @@ import {
   fromBase64URL
 } from '@/lib/shareUtils'
 import { Capacitor } from '@capacitor/core'
-import { ImageDown, Shield } from 'lucide-react'
+import { ImageDown, MessageSquare, Shield } from 'lucide-react'
 import { App as NativeApp } from '@capacitor/app'
 import { saveFile, shareFile } from '@/lib/shareFile'
 import { renderPlayImage } from '@/lib/playImage'
@@ -67,6 +69,7 @@ function App() {
     handleMirrorPlay,
     handleUpdatePlayName,
     handleUpdatePlayTags,
+    handleUpdatePlayComment,
     handleUpdatePlayer,
     handleMovePlayerLayer,
     handleUpdateDefense,
@@ -323,39 +326,56 @@ function App() {
     addToRoute({ x: snappedX, y: snappedY });
   };
 
+  // Ignore clicks while an image is being made: the first one takes a moment and invites a second click
+  const isExportingImageRef = useRef(false);
   const handleExportPlayImage = async () => {
-    if (!currentPlay) return;
+    if (!currentPlay || isExportingImageRef.current) return;
+    isExportingImageRef.current = true;
     try {
       const file = await renderPlayImage(currentPlay, { showDefense: isDefenseView });
-      await shareFile(file, { title: `Play: ${currentPlay.name}`, text: currentPlay.name });
+      // No text with the image: share targets would get it as a second item (the name is in the image anyway)
+      await shareFile(file, { title: `Play: ${currentPlay.name}` });
     } catch (e) {
       console.error("Image export failed", e);
       alert("Failed to create the play image.");
+    } finally {
+      isExportingImageRef.current = false;
     }
   };
 
-  // Bundle the current playbook into the standalone .html file that opens it in the app
-  const createPlaybookFile = async () => {
-    if (!currentPlaybook) return null;
-
-    const base64url = await encodeShareData(minifyPlaybook(currentPlaybook, plays));
-
-    const htmlContent = generateRedirectHtml(currentPlaybook.name, base64url);
-    const file = new File([htmlContent], `${currentPlaybook.name.replace(/\s+/g, '_')}_Share.html`, {
-      type: 'text/html'
-    });
-    return file;
+  // Bundle a playbook into the standalone .html file that opens it in the app
+  const createPlaybookFile = async (playbook: Playbook) => {
+    // `plays` carries the current playbook's grid positions; use this playbook's own
+    const playbookPlays = plays.map(p => ({ ...p, gridPosition: playbook.entries.find(e => e.playId === p.id)?.gridPosition }));
+    const base64url = await encodeShareData(minifyPlaybook(playbook, playbookPlays));
+    const htmlContent = generateRedirectHtml(playbook.name, base64url);
+    return new File([htmlContent], `${playbook.name.replace(/\s+/g, '_')}_Share.html`, { type: 'text/html' });
   };
 
-  const handleExportPlaybook = async () => {
+  // Bundle several playbooks into one file, in the backup format
+  const createPlaybooksFile = async (selected: Playbook[], title: string, fileName: string, savedAt: number) => {
+    const base64url = await encodeShareData(minifyBackup(selected, plays, savedAt));
+    return new File([generateRedirectHtml(title, base64url)], fileName, { type: 'text/html' });
+  };
+
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+
+  const handleExportPlaybooks = async (playbookIds: string[]) => {
+    setIsShareModalOpen(false);
+    const selected = playbooks.filter(pb => playbookIds.includes(pb.id));
+    if (selected.length === 0) return;
     try {
-      const file = await createPlaybookFile();
-      if (!file || !currentPlaybook) return;
+      const savedAt = Date.now();
+      const name = selected.length === 1 ? selected[0].name : `${selected.length} playbooks`;
+      const file = selected.length === 1
+        ? await createPlaybookFile(selected[0])
+        : await createPlaybooksFile(selected, `${name} (saved ${formatSavedAt(savedAt)})`, `Playbooks_${fileStampSavedAt(savedAt)}_Share.html`, savedAt);
 
       // Share the file, or download it where sharing isn't available
       const result = await shareFile(file, {
-        title: `Playbook: ${currentPlaybook.name}`,
-        text: `Open the attached file to view the playbook: ${currentPlaybook.name}`,
+        title: `Playbook: ${name}`,
+        text: `Open the attached file to view the playbook: ${selected.map(pb => pb.name).join(', ')}`,
       });
       if (result === 'downloaded') alert("File downloaded! Share this file with your coach/players.");
     } catch (e) {
@@ -366,8 +386,8 @@ function App() {
 
   const handleSavePlaybook = async () => {
     try {
-      const file = await createPlaybookFile();
-      if (!file) return;
+      if (!currentPlaybook) return;
+      const file = await createPlaybookFile(currentPlaybook);
       const location = await saveFile(file);
       alert(`Playbook saved to ${location}. Open the file to load it back into the app.`);
     } catch (e) {
@@ -381,10 +401,7 @@ function App() {
   const handleBackupAll = async () => {
     try {
       const savedAt = Date.now();
-      const label = formatSavedAt(savedAt);
-      const base64url = await encodeShareData(minifyBackup(playbooks, plays, savedAt));
-      const htmlContent = generateRedirectHtml(`All playbooks (saved ${label})`, base64url);
-      const file = new File([htmlContent], `PlayMakerFlag_Backup_${fileStampSavedAt(savedAt)}.html`, { type: 'text/html' });
+      const file = await createPlaybooksFile(playbooks, `All playbooks (saved ${formatSavedAt(savedAt)})`, `PlayMakerFlag_Backup_${fileStampSavedAt(savedAt)}.html`, savedAt);
       const location = await saveFile(file);
       localStorage.setItem('lastBackupAt', String(savedAt));
       setLastBackupAt(savedAt);
@@ -479,7 +496,7 @@ function App() {
         if (isBackup(parsedData)) {
           const backup = unminifyBackup(parsedData);
           toImport = backup.playbooks;
-          question = `This is a backup of ${backup.playbooks.length} playbook(s) saved ${formatSavedAt(backup.savedAt)}. Would you like to import them? They are added next to your current playbooks.`;
+          question = `This file contains ${backup.playbooks.length} playbook(s), saved ${formatSavedAt(backup.savedAt)}. Would you like to import them? They are added next to your current playbooks.`;
         } else {
           toImport = isMinified(parsedData) ? unminifyPlaybook(parsedData) : parsedData;
           question = "A playbook has been shared with you. Would you like to import it?";
@@ -816,6 +833,18 @@ function App() {
                   </div>
                 ))}
               </div>
+              {/* Comment above the field: one line of fixed height like the tags, the full text on hover */}
+              <div className="h-5 w-full flex justify-center shrink-0">
+                {currentPlay?.comment && (
+                  <button
+                    onClick={() => setIsCommentModalOpen(true)}
+                    className="max-w-full truncate text-sm italic text-slate-300 hover:text-emerald-400 transition-colors"
+                    title={currentPlay.comment}
+                  >
+                    {currentPlay.comment.replace(/\s*\n\s*/g, ' · ')}
+                  </button>
+                )}
+              </div>
               <div
                 ref={fieldContainerRef}
                 className="relative"
@@ -847,6 +876,23 @@ function App() {
                   >
                     <ImageDown size={18} />
                     <span className="text-[10px] font-semibold">PNG</span>
+                  </button>
+                )}
+
+                {/* Comment on the play, shown in the PNG: below the PNG button */}
+                {currentPlay && (
+                  <button
+                    onClick={() => setIsCommentModalOpen(true)}
+                    className={cn(
+                      "absolute z-30 top-14 right-1 md:right-auto md:left-full md:ml-2 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg border transition-colors",
+                      currentPlay.comment
+                        ? "bg-emerald-700 border-emerald-500 text-white"
+                        : "bg-slate-800/90 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-emerald-400"
+                    )}
+                    title={currentPlay.comment ? `Comment: ${currentPlay.comment}` : 'Add a comment to this play (shown in the PNG)'}
+                  >
+                    <MessageSquare size={18} />
+                    <span className="text-[10px] font-semibold">NOTE</span>
                   </button>
                 )}
                 <div style={{ transform: `scale(${fieldScale})`, transformOrigin: 'top left', width: 625, height: 625 }}>
@@ -1250,7 +1296,7 @@ function App() {
             setMobileTab('field');
           }}
           onOpenPrintSettings={() => setIsPrintModalOpen(true)}
-          onExportPlaybook={handleExportPlaybook}
+          onExportPlaybook={() => setIsShareModalOpen(true)}
           onSavePlaybook={handleSavePlaybook}
           onBackupAll={handleBackupAll}
           lastBackupAt={lastBackupAt}
@@ -1306,6 +1352,25 @@ function App() {
       </nav>
 
       {/* Modals & Print Layers */}
+      {isCommentModalOpen && currentPlay && (
+        <CommentModal
+          playName={currentPlay.name}
+          comment={currentPlay.comment || ''}
+          onClose={() => setIsCommentModalOpen(false)}
+          onSave={(comment) => {
+            handleUpdatePlayComment(currentPlay.id, comment);
+            setIsCommentModalOpen(false);
+          }}
+        />
+      )}
+      {isShareModalOpen && (
+        <ShareModal
+          playbooks={playbooks}
+          currentPlaybookId={currentPlaybookId}
+          onClose={() => setIsShareModalOpen(false)}
+          onShare={handleExportPlaybooks}
+        />
+      )}
       <PrintModal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}

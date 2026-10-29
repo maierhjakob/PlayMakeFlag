@@ -63,7 +63,8 @@ export type PlayDefense = {
 export interface Play {
     id: string;
     name: string;
-    description?: string;
+    /** Extra note on the play, shown in the PNG export (not printed) */
+    comment?: string;
     players: Player[];
     // gridPosition is NOT stored on Play — it lives in PlaybookEntry.
     // It may be attached at read-time for component convenience.
