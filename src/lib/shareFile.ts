@@ -45,11 +45,34 @@ export const shareFile = async (file: File, { title, text }: ShareFileOptions): 
         }
     }
 
+    downloadFile(file);
+    return 'downloaded';
+};
+
+const downloadFile = (file: File) => {
     const url = URL.createObjectURL(file);
     const a = document.createElement('a');
     a.href = url;
     a.download = file.name;
     a.click();
     URL.revokeObjectURL(url);
-    return 'downloaded';
+};
+
+/**
+ * Save a file on the device without the share sheet: into Documents in the app, a download in browsers.
+ * Returns where it ended up, for telling the user.
+ */
+export const saveFile = async (file: File): Promise<string> => {
+    if (Capacitor.isNativePlatform()) {
+        const path = file.name.replace(/[^\w.-]/g, '_');
+        await Filesystem.writeFile({
+            path,
+            data: await toBase64(file),
+            directory: Directory.Documents,
+        });
+        return `Documents/${path}`;
+    }
+
+    downloadFile(file);
+    return 'your downloads';
 };

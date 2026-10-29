@@ -176,6 +176,65 @@ export const isMinified = (data: any): boolean => {
     return Array.isArray(data) && data[0] === 3;
 };
 
+// BACKUP (V4): every playbook in one file, with the time it was saved.
+// The plays are stored once; each playbook keeps its own grid positions.
+export const minifyBackup = (playbooks: Playbook[], plays: Play[], savedAt: number): any => [
+    4, // Version
+    savedAt,
+    plays.map(p => minifyPlay({ ...p, gridPosition: undefined })),
+    playbooks.map(pb => [
+        pb.id,
+        pb.name,
+        pb.gridConfig.columnNames,
+        pb.entries.map(e => [e.playId, e.gridPosition ? [e.gridPosition.row, e.gridPosition.column] : null]),
+    ]),
+];
+
+/** A backup's save time for people to read, e.g. "29 Oct 2026, 14:05". */
+export const formatSavedAt = (savedAt: number): string =>
+    new Date(savedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+/** A backup's save time for its file name, in local time: 2026-10-29_14-05 */
+export const fileStampSavedAt = (savedAt: number): string => {
+    const d = new Date(savedAt);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
+};
+
+export const isBackup = (data: any): boolean => Array.isArray(data) && data[0] === 4;
+
+// Returns playbooks in the import shape: every play (handleImportData adds them to the global plays) plus the
+// playbook's own entries, so membership and grid positions come back exactly as saved
+export const unminifyBackup = (data: any): { savedAt: number; playbooks: (SerializedPlaybook & Pick<Playbook, 'entries'>)[] } => {
+    const plays: Play[] = data[2].map(unminifyPlay);
+    return {
+        savedAt: data[1],
+        playbooks: data[3].map((pb: any) => ({
+            id: pb[0],
+            name: pb[1],
+            gridConfig: { columnNames: pb[2] },
+            entries: pb[3].map((e: any) => ({
+                playId: e[0],
+                ...(e[1] ? { gridPosition: { row: e[1][0], column: e[1][1] } } : {}),
+            })),
+            plays,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        })),
+    };
+};
+
+/** Deflate-compress and Base64URL-encode minified data for embedding in a playbook file or share link. */
+export const encodeShareData = async (minified: any): Promise<string> => {
+    const stream = new Blob([JSON.stringify(minified)]).stream().pipeThrough(new CompressionStream('deflate'));
+    const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    return toBase64URL(binary);
+};
+
 // HTML Redirector Generator (Handshake Version)
 /** The share data embedded in an exported playbook file (see generateRedirectHtml), or null if it isn't one. */
 export const extractShareData = (html: string): string | null =>

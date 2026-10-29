@@ -19,15 +19,20 @@ import {
   minifyPlaybook,
   unminifyPlaybook,
   isMinified,
+  minifyBackup,
+  unminifyBackup,
+  isBackup,
+  encodeShareData,
+  formatSavedAt,
+  fileStampSavedAt,
   generateRedirectHtml,
   extractShareData,
-  toBase64URL,
   fromBase64URL
 } from '@/lib/shareUtils'
 import { Capacitor } from '@capacitor/core'
 import { ImageDown, Shield } from 'lucide-react'
 import { App as NativeApp } from '@capacitor/app'
-import { shareFile } from '@/lib/shareFile'
+import { saveFile, shareFile } from '@/lib/shareFile'
 import { renderPlayImage } from '@/lib/playImage'
 
 const FIELD_PX = 625;
@@ -329,28 +334,25 @@ function App() {
     }
   };
 
+  // Bundle the current playbook into the standalone .html file that opens it in the app
+  const createPlaybookFile = async () => {
+    if (!currentPlaybook) return null;
+
+    const base64url = await encodeShareData(minifyPlaybook(currentPlaybook, plays));
+
+    const htmlContent = generateRedirectHtml(currentPlaybook.name, base64url);
+    const file = new File([htmlContent], `${currentPlaybook.name.replace(/\s+/g, '_')}_Share.html`, {
+      type: 'text/html'
+    });
+    return file;
+  };
+
   const handleExportPlaybook = async () => {
     try {
-      if (!currentPlaybook) return;
+      const file = await createPlaybookFile();
+      if (!file || !currentPlaybook) return;
 
-      // 1. Minify and Compress
-      const minified = minifyPlaybook(currentPlaybook, plays);
-      const data = JSON.stringify(minified);
-      const stream = new Blob([data]).stream().pipeThrough(new CompressionStream('deflate'));
-      const compressedResponse = new Response(stream);
-      const compressedBuffer = await compressedResponse.arrayBuffer();
-
-      // 2. Base64 Encoding
-      const binary = String.fromCharCode(...new Uint8Array(compressedBuffer));
-      const base64url = toBase64URL(binary);
-
-      // 3. Generate Redirect HTML
-      const htmlContent = generateRedirectHtml(currentPlaybook.name, base64url);
-      const file = new File([htmlContent], `${currentPlaybook.name.replace(/\s+/g, '_')}_Share.html`, {
-        type: 'text/html'
-      });
-
-      // 4. Share the file, or download it where sharing isn't available
+      // Share the file, or download it where sharing isn't available
       const result = await shareFile(file, {
         title: `Playbook: ${currentPlaybook.name}`,
         text: `Open the attached file to view the playbook: ${currentPlaybook.name}`,
@@ -359,6 +361,37 @@ function App() {
     } catch (e) {
       console.error("Export failed", e);
       alert("Failed to generate sharing file.");
+    }
+  };
+
+  const handleSavePlaybook = async () => {
+    try {
+      const file = await createPlaybookFile();
+      if (!file) return;
+      const location = await saveFile(file);
+      alert(`Playbook saved to ${location}. Open the file to load it back into the app.`);
+    } catch (e) {
+      console.error("Save failed", e);
+      alert("Failed to save the playbook file.");
+    }
+  };
+
+  const [lastBackupAt, setLastBackupAt] = useState<number | null>(() => Number(localStorage.getItem('lastBackupAt')) || null);
+
+  const handleBackupAll = async () => {
+    try {
+      const savedAt = Date.now();
+      const label = formatSavedAt(savedAt);
+      const base64url = await encodeShareData(minifyBackup(playbooks, plays, savedAt));
+      const htmlContent = generateRedirectHtml(`All playbooks (saved ${label})`, base64url);
+      const file = new File([htmlContent], `PlayMakerFlag_Backup_${fileStampSavedAt(savedAt)}.html`, { type: 'text/html' });
+      const location = await saveFile(file);
+      localStorage.setItem('lastBackupAt', String(savedAt));
+      setLastBackupAt(savedAt);
+      alert(`Backup of ${playbooks.length} playbook(s) saved to ${location}. Open the file to restore it.`);
+    } catch (e) {
+      console.error("Backup failed", e);
+      alert("Failed to save the backup file.");
     }
   };
 
@@ -442,10 +475,18 @@ function App() {
         const jsonString = await decompressedResponse.text();
         const parsedData = JSON.parse(jsonString);
 
-        const playbookToImport = isMinified(parsedData) ? unminifyPlaybook(parsedData) : parsedData;
+        let toImport, question;
+        if (isBackup(parsedData)) {
+          const backup = unminifyBackup(parsedData);
+          toImport = backup.playbooks;
+          question = `This is a backup of ${backup.playbooks.length} playbook(s) saved ${formatSavedAt(backup.savedAt)}. Would you like to import them? They are added next to your current playbooks.`;
+        } else {
+          toImport = isMinified(parsedData) ? unminifyPlaybook(parsedData) : parsedData;
+          question = "A playbook has been shared with you. Would you like to import it?";
+        }
 
-        if (window.confirm("A playbook has been shared with you. Would you like to import it?")) {
-          const success = handleImportData(JSON.stringify(playbookToImport));
+        if (window.confirm(question)) {
+          const success = handleImportData(JSON.stringify(toImport));
           if (success) {
             window.history.replaceState(null, '', window.location.pathname);
             lastHandledHashRef.current = null;
@@ -1210,6 +1251,9 @@ function App() {
           }}
           onOpenPrintSettings={() => setIsPrintModalOpen(true)}
           onExportPlaybook={handleExportPlaybook}
+          onSavePlaybook={handleSavePlaybook}
+          onBackupAll={handleBackupAll}
+          lastBackupAt={lastBackupAt}
         />
       </main>
 

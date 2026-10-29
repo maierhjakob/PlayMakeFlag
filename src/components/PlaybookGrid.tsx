@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Grid3x3, Edit2, X, Plus, Trash2, BookOpen, Printer, Share2 } from 'lucide-react';
+import { Grid3x3, Edit2, X, Plus, Trash2, BookOpen, Printer, Share2, Download, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatSavedAt } from '@/lib/shareUtils';
 import type { Play, Playbook } from '@/types';
 import { MiniPlayPreview } from './MiniPlayPreview';
 
@@ -14,6 +15,9 @@ interface PlaybookGridProps {
     onDeletePlaybook: (id: string) => void;
     onOpenPrintSettings: () => void;
     onExportPlaybook: () => void;
+    onSavePlaybook: () => void;
+    onBackupAll: () => void;
+    lastBackupAt: number | null;
 
     // Grid management
     plays: Play[];
@@ -50,6 +54,9 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     onRemoveColumn,
     onOpenPrintSettings,
     onExportPlaybook,
+    onSavePlaybook,
+    onBackupAll,
+    lastBackupAt,
     className,
     style
 }) => {
@@ -101,6 +108,13 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                         <BookOpen size={20} /> Playbooks
                     </h2>
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={onSavePlaybook}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg border border-slate-700 transition-all flex items-center gap-2 text-sm font-bold"
+                            title="Save Playbook as a file on this device"
+                        >
+                            <Download size={16} /> Save
+                        </button>
                         <button
                             onClick={onExportPlaybook}
                             className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg border border-slate-700 transition-all flex items-center gap-2 text-sm font-bold"
@@ -196,6 +210,20 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                             </button>
                         </div>
                     )}
+
+                    {/* Backup of all playbooks */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={onBackupAll}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-emerald-400 py-1.5 px-2 rounded text-xs font-medium border border-slate-700 transition-all flex items-center justify-center gap-1"
+                            title="Save all playbooks into one backup file on this device"
+                        >
+                            <Archive size={12} /> Back up all playbooks
+                        </button>
+                        <span className="text-[10px] text-slate-500">
+                            {lastBackupAt ? `Last backup: ${formatSavedAt(lastBackupAt)}` : 'No backup yet'}
+                        </span>
+                    </div>
                 </div>
 
                 <div className="border-t border-slate-700/50 pt-3">
