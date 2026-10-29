@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Field } from '@/components/Field'
 import { PlaybookSidebar } from '@/components/PlaybookSidebar'
 import { PlaybookGrid } from '@/components/PlaybookGrid'
@@ -14,6 +14,7 @@ import { ShareModal } from '@/components/ShareModal'
 import { CommentModal } from '@/components/CommentModal'
 import { MergeModal } from '@/components/MergeModal'
 import { PrintView } from '@/components/PrintView'
+import { GuideModal } from '@/components/GuideModal'
 import type { Point, RouteType, RouteSegment, Coverage, Defender, Playbook } from '@/types'
 import { usePlaybook } from '@/hooks/usePlaybook'
 import { S, clampPoint } from '@/lib/constants'
@@ -167,6 +168,13 @@ function App() {
     const y = (clientY - rect.top) / fieldScale;
     return isDefenseView ? { x: FIELD_PX - x, y: FIELD_PX - y } : { x, y };
   };
+
+  // Guide: opens by itself on the first start, later from the Help button next to Print
+  const [isGuideOpen, setIsGuideOpen] = useState(() => !localStorage.getItem('guideSeen'));
+  const closeGuide = useCallback(() => {
+    localStorage.setItem('guideSeen', '1');
+    setIsGuideOpen(false);
+  }, []);
 
   // Print state
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -1314,6 +1322,7 @@ function App() {
           }}
           onOpenPrintSettings={() => setIsPrintModalOpen(true)}
           onExportPlaybook={() => setIsShareModalOpen(true)}
+          onOpenGuide={() => setIsGuideOpen(true)}
           onBackupAll={() => handleBackupAll()}
           onChangeBackupLocation={canPickBackupLocation ? () => handleBackupAll(true) : undefined}
           backupFileName={backupFileName}
@@ -1392,6 +1401,8 @@ function App() {
           onShare={handleExportPlaybooks}
         />
       )}
+      {isGuideOpen && <GuideModal onClose={closeGuide} />}
+
       <PrintModal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}

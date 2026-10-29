@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Grid3x3, Edit2, X, Plus, Trash2, BookOpen, Printer, Share2, Archive } from 'lucide-react';
+import { Grid3x3, Edit2, X, Plus, Trash2, BookOpen, Printer, Share2, Archive, CircleHelp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatSavedAt } from '@/lib/shareUtils';
 import type { Play, Playbook } from '@/types';
@@ -16,6 +16,7 @@ interface PlaybookGridProps {
     onOpenPrintSettings: () => void;
     onExportPlaybook: () => void;
     onBackupAll: () => void;
+    onOpenGuide: () => void;
     /** Only where the browser can save to a chosen file */
     onChangeBackupLocation?: () => void;
     lastBackupAt: number | null;
@@ -58,6 +59,7 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
     onOpenPrintSettings,
     onExportPlaybook,
     onBackupAll,
+    onOpenGuide,
     onChangeBackupLocation,
     lastBackupAt,
     backupFileName,
@@ -107,11 +109,11 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
         <div style={style} className={cn("flex flex-col h-full bg-slate-900 text-white w-[490px] border-l border-slate-700 font-sans", className)}>
             {/* Header */}
             <div className="p-4 border-b border-slate-700 bg-slate-950/50 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-xl font-bold flex items-center gap-2 text-emerald-400">
                         <BookOpen size={20} /> Playbooks
                     </h2>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 whitespace-nowrap">
                         <button
                             onClick={onExportPlaybook}
                             className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg border border-slate-700 transition-all flex items-center gap-2 text-sm font-bold"
@@ -125,6 +127,13 @@ export const PlaybookGrid: React.FC<PlaybookGridProps> = ({
                             title="Print Playbook"
                         >
                             <Printer size={16} /> Print
+                        </button>
+                        <button
+                            onClick={onOpenGuide}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg border border-slate-700 transition-all flex items-center gap-2 text-sm font-bold"
+                            title="How to use the play designer"
+                        >
+                            <CircleHelp size={16} /> Help
                         </button>
                     </div>
                 </div>
