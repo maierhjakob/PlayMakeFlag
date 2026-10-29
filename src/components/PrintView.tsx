@@ -1,5 +1,6 @@
 import { MiniPlayPreview, YARD_NUMBER_MARGIN } from './MiniPlayPreview';
 import type { Playbook, Play } from '@/types';
+import { FIELD_PIXEL_HEIGHT, S } from '@/lib/constants';
 
 interface PrintViewProps {
     playbook: Playbook;
@@ -17,6 +18,15 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerP
     const cellWidth = ((11.5 - 0.5) / COLS - 0.3) * 0.95; // card - row number column, minus tag column + padding
     const cellHeight = ((6.33 - 0.4) / ROWS) * 0.98;     // card - header row
     const previewHeight = Math.round(PREVIEW_WIDTH * (1 + YARD_NUMBER_MARGIN) * cellHeight / cellWidth);
+
+    // Every column count shows the same field depth, so narrow cells don't get extra empty field on top:
+    // up to 10 yards past the LOS, or the deepest point of the printed plays, plus a margin
+    const deepestY = Math.min(...plays.filter(p => p.gridPosition).flatMap(p => p.players.flatMap(player => [
+        player.position.y,
+        ...(player.motion ? [player.motion.y] : []),
+        ...player.routes.flatMap(r => r.points.map(pt => pt.y)),
+    ])));
+    const depthYards = Math.max(15, (FIELD_PIXEL_HEIGHT - deepestY) / S) + 1.5;
 
     const getPlayAtCell = (row: number, col: number) => {
         return plays.find(p => p.gridPosition?.row === row && p.gridPosition?.column === col) || null;
@@ -58,6 +68,7 @@ export const PrintView: React.FC<PrintViewProps> = ({ playbook, plays, playsPerP
                                                         width={PREVIEW_WIDTH}
                                                         height={previewHeight}
                                                         strokeWidth={2.5}
+                                                        depthYards={depthYards}
                                                         className="print-mini-preview"
                                                         yardNumbersOutside
                                                     />

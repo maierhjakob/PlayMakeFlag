@@ -12,6 +12,8 @@ interface MiniPlayPreviewProps {
     yardNumbersOutside?: boolean;
     /** Also draw the play's defense (zones, man lines, rushers, X marks) */
     showDefense?: boolean;
+    /** Field depth shown above the bottom edge, in yards. Scales the height on its own; by default the height scales like the width */
+    depthYards?: number;
     className?: string;
 }
 
@@ -25,15 +27,17 @@ export const MiniPlayPreview: React.FC<MiniPlayPreviewProps> = ({
     strokeWidth = 1.1,
     className = '',
     yardNumbersOutside = false,
-    showDefense = false
+    showDefense = false,
+    depthYards
 }) => {
     // Field dimensions (25 yards wide @ 25px/yard)
     const VIRTUAL_WIDTH = 625;
     const FIELD_BOTTOM = 625; // Bottom edge, so the deepest backfield spot (QB at 4y behind LOS) and its dot stay visible
 
-    // Uniform scale from the width; the height decides how much field depth is shown above the bottom edge
+    // Uniform scale from the width, so the height decides how much field depth is shown above the bottom edge.
+    // With depthYards the height is scaled to show exactly that depth; dots and strokes stay round.
     const SCALE_X = width / VIRTUAL_WIDTH;
-    const SCALE_Y = SCALE_X;
+    const SCALE_Y = depthYards ? height / (depthYards * 25) : SCALE_X;
     const Y_START = FIELD_BOTTOM - height / SCALE_Y;
     const MARGIN = yardNumbersOutside ? width * YARD_NUMBER_MARGIN : 0;
 
